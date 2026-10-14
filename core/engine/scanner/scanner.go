@@ -37,6 +37,7 @@ type ScannerOpts struct {
 	EnableHTTP2               bool
 	SpoofHeader               string
 	SpoofIP                   string
+	SpoofPrefix               string
 	CustomHTTPHeaders         []string // Custom HTTP headers in "Name: Value" format
 	FollowRedirects           bool
 	ResponseBodyPreviewSize   int

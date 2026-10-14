@@ -78,6 +78,7 @@ type CliOptions struct {
 
 	// Spoofing options
 	SpoofIP     string
+	SpoofPrefix string
 	SpoofHeader string
 
 	// StreamResponseBody

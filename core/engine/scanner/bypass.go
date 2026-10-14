@@ -231,6 +231,7 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 		ReconCache:   s.scannerOpts.ReconCache,
 		SpoofHeader:  s.scannerOpts.SpoofHeader,
 		SpoofIP:      s.scannerOpts.SpoofIP,
+		SpoofPrefix:  s.scannerOpts.SpoofPrefix,
 		Method:       method,
 		Body:         body,
 	})
