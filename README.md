@@ -135,6 +135,10 @@ Usage:
         Filter results by maximum Content-Length (example: -max-cl 5000)
   -H, -header
         Custom HTTP header (example: -H "X-My-Header: value"), can be used multiple times
+  -X, -request
+        HTTP method used for base requests, applied by all bypass modules (example: -X POST) (Default: GET)
+  -data
+        Request body sent verbatim with base requests; a leading @ reads the body from a file (example: --data 'user=admin', --data @body.json). No Content-Type is added automatically, use -H
   -sc, -strict-scheme
         Only test URLs with the original scheme from input (prevents auto-expansion to http/https) (Default: false)
   -http2
@@ -170,6 +174,11 @@ Standard command(s):
 gobypass403 -u "https://go-test-webapp.com/admin" -mc "200"
 gobypass403 -u "https://go-test-webapp.com/admin" -mc "200,500" -cr 10
 gobypass403 -u "https://go-test-webapp.com/admin" -mc "mid_paths,nginx_bypasses,headers_ip" -cr 20 -mct "application/json,image/png"
+
+# Test POST (or any method) requests with a body - all modules use your method/body
+# as the base request. Add Content-Type yourself via -H if needed.
+gobypass403 -u "https://go-test-webapp.com/admin" -X POST --data 'user=admin&role=root' -H "Content-Type: application/x-www-form-urlencoded" -mc "200"
+gobypass403 -u "https://go-test-webapp.com/api/v1/users" -X POST --data @create_user.json -H "Content-Type: application/json" -mc "200"
 ```
 
 Using a list of target URLs:

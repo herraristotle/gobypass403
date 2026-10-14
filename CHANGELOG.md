@@ -1,3 +1,13 @@
+# Unreleased
+
+- **Added custom HTTP method and request body support** ([issue #2](https://github.com/slicingmelon/gobypass403/issues/2)) — new `-X/--request` and `--data` flags let you test POST (or any method) requests with a body. All bypass modules now use your method and body as the base request instead of hardcoded GET.
+  - `-X POST` / `-X PUT` / any valid HTTP token; validated against RFC 7230 to block request-line smuggling.
+  - `--data 'raw body'` or `--data @body.json` (body read verbatim from file). No Content-Type is added automatically — pass `-H "Content-Type: ..."` yourself, matching the tool's raw-request philosophy.
+  - `Content-Length` is computed automatically; an explicitly provided `-H Content-Length` takes precedence.
+  - Findings' curl PoC commands now include `-X <method>` (non-GET) and `-d '<body>'` with shell-safe quoting, so successful bypasses are copy-paste reproducible.
+  - Fixed `-r` debug-token resend silently dropping request bodies — resending a POST finding now reproduces the original request byte-exact. The `-r` token info printout also shows the body.
+  - Exceptions: the `http_methods` module keeps rotating methods (that is its purpose), and haproxy's CVE-2021-40346 smuggling job keeps its hardcoded POST and exploit body.
+
 # 0.8.8-2
 
 - **Added Debian packaging** — Created standard `debian/` directory (control, copyright, changelog, rules) and a `build-deb` job in the release workflow. On each `v*` tag push, a `.deb` package is now built and attached to the GitHub release.
