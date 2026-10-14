@@ -84,6 +84,7 @@ type PayloadGenerator struct {
 	reconCache   *recon.ReconCache
 	spoofHeader  string
 	spoofIP      string
+	spoofPrefix  string
 	method       string
 	body         string
 }
@@ -94,6 +95,7 @@ type PayloadGeneratorOptions struct {
 	ReconCache   *recon.ReconCache
 	SpoofHeader  string
 	SpoofIP      string
+	SpoofPrefix  string // Custom path prefixes for api_versions (comma-separated)
 	Method       string // HTTP method for base requests; empty means GET
 	Body         string // Request body for base requests; empty means none
 }
@@ -109,6 +111,7 @@ func NewPayloadGenerator(opts PayloadGeneratorOptions) *PayloadGenerator {
 		reconCache:   opts.ReconCache,
 		spoofHeader:  opts.SpoofHeader,
 		spoofIP:      opts.SpoofIP,
+		spoofPrefix:  opts.SpoofPrefix,
 		method:       method,
 		body:         opts.Body,
 	}
@@ -144,6 +147,8 @@ func (pg *PayloadGenerator) Generate() []BypassPayload {
 		return pg.GenerateHeadersHostPayloads(pg.targetURL, pg.bypassModule)
 	case "headers_hop_by_hop":
 		return pg.GenerateHeadersHopByHopPayloads(pg.targetURL, pg.bypassModule)
+	case "api_versions":
+		return pg.GenerateAPIVersionPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_normalization":
 		return pg.GenerateUnicodePathNormalizationsPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_truncation":

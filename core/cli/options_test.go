@@ -79,7 +79,7 @@ func TestResolveRequestBodyErrorsOnMissingFile(t *testing.T) {
 // TestNewModulesRegistered pins unKover-gap module registration so a dropped
 // map entry fails loudly (SPEC-unkover-gaps.md).
 func TestNewModulesRegistered(t *testing.T) {
-	for _, module := range []string{"headers_hop_by_hop"} {
+	for _, module := range []string{"headers_hop_by_hop", "api_versions"} {
 		if !AvailableModules[module] {
 			t.Errorf("module %q not registered in AvailableModules", module)
 		}
