@@ -114,6 +114,7 @@ var AvailableModules = map[string]bool{
 	"headers_port":               true,
 	"headers_url":                true,
 	"headers_host":               true,
+	"headers_hop_by_hop":         true,
 	"unicode_path_normalization": true,
 	"unicode_path_truncation":    true,
 	"unicode_path_experimental":  true,

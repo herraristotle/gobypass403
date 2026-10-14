@@ -142,6 +142,8 @@ func (pg *PayloadGenerator) Generate() []BypassPayload {
 		return pg.GenerateHeadersURLPayloads(pg.targetURL, pg.bypassModule)
 	case "headers_host":
 		return pg.GenerateHeadersHostPayloads(pg.targetURL, pg.bypassModule)
+	case "headers_hop_by_hop":
+		return pg.GenerateHeadersHopByHopPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_normalization":
 		return pg.GenerateUnicodePathNormalizationsPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_truncation":
