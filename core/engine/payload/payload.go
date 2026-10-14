@@ -41,6 +41,7 @@ var BypassModulesRegistry = []string{
 	// module bytes; new modules get new indices at the end.
 	"headers_hop_by_hop",
 	"api_versions",
+	"http10",
 }
 
 var (
@@ -153,6 +154,8 @@ func (pg *PayloadGenerator) Generate() []BypassPayload {
 		return pg.GenerateHeadersHopByHopPayloads(pg.targetURL, pg.bypassModule)
 	case "api_versions":
 		return pg.GenerateAPIVersionPayloads(pg.targetURL, pg.bypassModule)
+	case "http10":
+		return pg.GenerateHTTP10Payloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_normalization":
 		return pg.GenerateUnicodePathNormalizationsPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_truncation":
@@ -182,6 +185,7 @@ type BypassPayload struct {
 	Body         string    // this gets updated, represents everything that goes into the body of the request
 	BypassModule string    // always gets updated
 	PayloadToken string    // always gets updated
+	HTTPVersion  string    // optional request-line version (e.g. "HTTP/1.0"); empty means HTTP/1.1 default
 }
 
 type SeedData struct {
@@ -361,6 +365,15 @@ func GeneratePayloadToken(job BypassPayload) string {
 			bb.B = append(bb.B, byte(bodyLen))
 		}
 		bb.Write(bytesutil.ToUnsafeBytes(job.Body))
+	}
+
+	// Add HTTPVersion field — only when set, so default-payload tokens
+	// stay byte-identical to the pre-http10 format (field 8, short-string
+	// encoding like fields 1-3)
+	if job.HTTPVersion != "" {
+		bb.B = append(bb.B, 8) // field type for HTTP version (8)
+		bb.B = append(bb.B, byte(len(job.HTTPVersion)))
+		bb.Write(bytesutil.ToUnsafeBytes(job.HTTPVersion))
 	}
 
 	// Compress and encode the buffer contents
@@ -568,6 +581,10 @@ func DecodePayloadToken(token string) (BypassPayload, error) {
 				result.Body = string(bb[pos : pos+fieldLen])
 				pos += fieldLen
 			}
+
+		case 8: // HTTPVersion (optional; absent = HTTP/1.1 default)
+			result.HTTPVersion = string(bb[pos : pos+fieldLen])
+			pos += fieldLen
 		}
 	}
 	return result, nil

@@ -101,7 +101,8 @@ func BuildRawRequest(httpclient *HTTPClient, bypassPayload payload.BypassPayload
 		bypassPayload.BypassModule == "headers_ip" ||
 		bypassPayload.BypassModule == "headers_port" ||
 		bypassPayload.BypassModule == "headers_url" ||
-		bypassPayload.BypassModule == "headers_host"
+		bypassPayload.BypassModule == "headers_host" ||
+		bypassPayload.BypassModule == "http10"
 
 	// Get ByteBuffer from pool
 	bb := requestBufferPool.Get()
@@ -111,7 +112,14 @@ func BuildRawRequest(httpclient *HTTPClient, bypassPayload payload.BypassPayload
 	bb.B = append(bb.B, strSpace...)
 	bb.B = append(bb.B, bypassPayload.RawURI...)
 	bb.B = append(bb.B, strSpace...)
-	bb.B = append(bb.B, strHTTP11...)
+	// Explicit request-line version (e.g. HTTP/1.0 for the http10 module);
+	// empty means the HTTP/1.1 default
+	if bypassPayload.HTTPVersion != "" {
+		bb.B = append(bb.B, bypassPayload.HTTPVersion...)
+		bb.B = append(bb.B, strCRLF...)
+	} else {
+		bb.B = append(bb.B, strHTTP11...)
+	}
 
 	// Use HeaderOverrides map instead of creating new map
 	// This avoids allocation since it's pre-computed during client initialization

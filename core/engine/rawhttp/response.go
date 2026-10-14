@@ -221,6 +221,12 @@ func BuildCurlCommandWithOpts(bypassPayload payload.BypassPayload, clientOpts *H
 	cmdBuf.Write(strSpace)
 	cmdBuf.Write(curlFlags)
 
+	// Non-default request-line version (http10 module) → --http1.0 etc.
+	if bypassPayload.HTTPVersion != "" {
+		cmdBuf.Write(strSpace)
+		cmdBuf.WriteString("--http" + strings.TrimPrefix(bypassPayload.HTTPVersion, "HTTP/"))
+	}
+
 	// Add --request-target if RawURI doesn't start with /
 	if needsRequestTarget {
 		cmdBuf.Write(strSpace)
