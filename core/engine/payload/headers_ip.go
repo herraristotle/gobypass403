@@ -153,6 +153,10 @@ func (pg *PayloadGenerator) GenerateHeadersIPPayloads(targetURL string, bypassMo
 					fmt.Sprintf("by=%s", ip),   // Interface receiving the request
 					fmt.Sprintf("for=%s", ip),  // Client initiating the request
 					fmt.Sprintf("host=%s", ip), // Original Host header (testing with IP value)
+					// Quoted-pair value shape (HackTricks WAF bypass research:
+					// `Forwarded: for="[..]"` — RFC 7239 quoted form that some
+					// WAF rules fail to match)
+					fmt.Sprintf("for=%q", ip),
 					// "proto" handled by headers_scheme module
 				}
 				// Add combination if needed? e.g., for=ip;by=ip - Maybe too complex for now.
