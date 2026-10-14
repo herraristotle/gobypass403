@@ -118,6 +118,7 @@ var AvailableModules = map[string]bool{
 	"headers_hop_by_hop":         true,
 	"api_versions":               true,
 	"http10":                     true,
+	"headers_method":             true,
 	"unicode_path_normalization": true,
 	"unicode_path_truncation":    true,
 	"unicode_path_experimental":  true,

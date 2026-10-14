@@ -165,20 +165,24 @@ func TestHTTP10CurlPOC(t *testing.T) {
 }
 
 // TestHTTP10Registered pins registration in BypassModulesRegistry (append
-// only — registry order is baked into debug-token module bytes).
+// only — registry order is baked into debug-token module bytes: http10
+// must sit after all pre-existing modules, though later modules may append
+// after it).
 func TestHTTP10Registered(t *testing.T) {
-	found := false
-	lastNonDefault := ""
-	for _, m := range payload.BypassModulesRegistry {
+	idx := -1
+	apiIdx := -1
+	for i, m := range payload.BypassModulesRegistry {
 		if m == "http10" {
-			found = true
+			idx = i
 		}
-		lastNonDefault = m
+		if m == "api_versions" {
+			apiIdx = i
+		}
 	}
-	if !found {
+	if idx == -1 {
 		t.Fatal("module \"http10\" not in payload.BypassModulesRegistry")
 	}
-	if lastNonDefault != "http10" {
-		t.Errorf("http10 must be appended last in registry, last entry = %q", lastNonDefault)
+	if idx < apiIdx {
+		t.Errorf("http10 index %d must come after api_versions (append-only), got api_versions at %d", idx, apiIdx)
 	}
 }

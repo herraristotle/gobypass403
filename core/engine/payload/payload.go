@@ -42,6 +42,7 @@ var BypassModulesRegistry = []string{
 	"headers_hop_by_hop",
 	"api_versions",
 	"http10",
+	"headers_method",
 }
 
 var (
@@ -156,6 +157,8 @@ func (pg *PayloadGenerator) Generate() []BypassPayload {
 		return pg.GenerateAPIVersionPayloads(pg.targetURL, pg.bypassModule)
 	case "http10":
 		return pg.GenerateHTTP10Payloads(pg.targetURL, pg.bypassModule)
+	case "headers_method":
+		return pg.GenerateHeadersMethodPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_normalization":
 		return pg.GenerateUnicodePathNormalizationsPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_truncation":
