@@ -90,7 +90,8 @@ func (pg *PayloadGenerator) GenerateEndPathsPayloads(targetURL string, bypassMod
 	for rawURI := range uniquePaths {
 		job := BypassPayload{
 			OriginalURL:  targetURL,
-			Method:       "GET", // Consider making method configurable or based on input
+			Method:       pg.method,
+			Body:         pg.body,
 			Scheme:       parsedURL.Scheme,
 			Host:         parsedURL.Host,
 			RawURI:       rawURI, // rawURI includes the correctly appended query

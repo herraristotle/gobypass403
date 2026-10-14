@@ -205,7 +205,8 @@ func (pg *PayloadGenerator) GeneratePathPrefixPayloads(targetURL string, bypassM
 
 		job := BypassPayload{
 			OriginalURL:  targetURL,
-			Method:       "GET", // Defaulting to GET
+			Method:       pg.method,
+			Body:         pg.body,
 			Scheme:       parsedURL.Scheme,
 			Host:         parsedURL.Host,
 			RawURI:       rawURI,
