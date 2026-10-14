@@ -8,6 +8,7 @@ Internal tests for the raw request file parser (--request-file).
 package cli
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -136,4 +137,72 @@ func TestParseRawRequestHostHeaderCaseInsensitive(t *testing.T) {
 			t.Errorf("line %q: Host leaked into headers: %v", line, pr.Headers)
 		}
 	}
+}
+
+func TestLoadParsedRequestFromFile(t *testing.T) {
+	path := writeTempRequestFile(t, crlfRequest)
+
+	opts := &CliOptions{RequestFile: path}
+	if err := opts.loadParsedRequest(); err != nil {
+		t.Fatalf("loadParsedRequest failed: %v", err)
+	}
+	if opts.ParsedRequest == nil {
+		t.Fatal("ParsedRequest not populated")
+	}
+	if opts.ParsedRequest.Method != "POST" || opts.ParsedRequest.Host != "backend.internal.example" {
+		t.Errorf("unexpected parsed request: %+v", opts.ParsedRequest)
+	}
+}
+
+func TestLoadParsedRequestRejectsMethodAndDataFlags(t *testing.T) {
+	path := writeTempRequestFile(t, crlfRequest)
+
+	cases := []struct {
+		name string
+		opts *CliOptions
+	}{
+		{"with explicit -X", &CliOptions{RequestFile: path, methodSet: true}},
+		{"with --data", &CliOptions{RequestFile: path, dataSet: true}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.opts.loadParsedRequest()
+			if err == nil {
+				t.Fatal("expected mutual exclusion error, got nil")
+			}
+			if !strings.Contains(err.Error(), "--request-file") {
+				t.Errorf("error should mention --request-file: %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadParsedRequestErrorsOnBadInput(t *testing.T) {
+	if err := (&CliOptions{RequestFile: "/nonexistent/req.txt"}).loadParsedRequest(); err == nil {
+		t.Error("missing file: expected error, got nil")
+	}
+
+	bad := writeTempRequestFile(t, "not a request at all")
+	if err := (&CliOptions{RequestFile: bad}).loadParsedRequest(); err == nil {
+		t.Error("unparseable file: expected error, got nil")
+	}
+}
+
+func TestLoadParsedRequestNoopWithoutFlag(t *testing.T) {
+	opts := &CliOptions{}
+	if err := opts.loadParsedRequest(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts.ParsedRequest != nil {
+		t.Error("ParsedRequest should stay nil without --request-file")
+	}
+}
+
+func writeTempRequestFile(t *testing.T, content string) string {
+	t.Helper()
+	path := t.TempDir() + "/req.txt"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

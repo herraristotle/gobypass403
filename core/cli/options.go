@@ -57,6 +57,12 @@ type CliOptions struct {
 	Data   string // --data: raw request body, or @filepath to read body from a file
 	Body   string // Resolved request body (file contents when Data is @filepath)
 
+	// Full raw request import (issue #2, phase 2)
+	RequestFile    string         // --request-file: path to a raw HTTP request file
+	ParsedRequest  *ParsedRequest // Parsed contents of RequestFile
+	methodSet      bool           // -X was explicitly provided on the command line
+	dataSet        bool           // --data was explicitly provided on the command line
+
 	// Output options
 	OutDir        string
 	ResultsDBFile string
@@ -299,6 +305,11 @@ func (o *CliOptions) validate() error {
 			return err
 		}
 		o.Body = body
+	}
+
+	// Load and validate a full raw request file (--request-file)
+	if err := o.loadParsedRequest(); err != nil {
+		return err
 	}
 
 	// Process and validate status codes
@@ -583,6 +594,28 @@ func (o *CliOptions) validateCustomHeaders() error {
 		}
 	}
 
+	return nil
+}
+
+// loadParsedRequest reads and parses the --request-file input (issue #2,
+// phase 2). The file already carries a method and body, so combining it with
+// -X/--request is a usage error rather than a silent precedence rule.
+func (o *CliOptions) loadParsedRequest() error {
+	if o.RequestFile == "" {
+		return nil
+	}
+	if o.methodSet || o.dataSet {
+		return fmt.Errorf("--request-file cannot be combined with -X/--request or --data: the file already defines the method and body")
+	}
+	content, err := os.ReadFile(o.RequestFile)
+	if err != nil {
+		return fmt.Errorf("failed to read request file %q: %v", o.RequestFile, err)
+	}
+	pr, err := parseRawRequest(string(content))
+	if err != nil {
+		return fmt.Errorf("failed to parse request file %q: %v", o.RequestFile, err)
+	}
+	o.ParsedRequest = pr
 	return nil
 }
 
