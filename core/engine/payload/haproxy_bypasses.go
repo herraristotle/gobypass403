@@ -165,10 +165,12 @@ func (pg *PayloadGenerator) generateHAProxy_CVE_2023_45539(targetURL string, byp
 		query = "?" + parsedURL.Query
 	}
 
-	// Base job template
+	// Base job template (CVE-2023-45539 requests follow the user's -X/--data;
+	// the CVE-2021-40346 smuggling job above keeps its hardcoded POST+body)
 	baseJob := BypassPayload{
 		OriginalURL:  targetURL,
-		Method:       "GET",
+		Method:       pg.method,
+		Body:         pg.body,
 		Scheme:       parsedURL.Scheme,
 		Host:         parsedURL.Host,
 		BypassModule: bypassModule,
