@@ -221,10 +221,17 @@ func BuildCurlCommandWithOpts(bypassPayload payload.BypassPayload, clientOpts *H
 	cmdBuf.Write(strSpace)
 	cmdBuf.Write(curlFlags)
 
-	// Non-default request-line version (http10 module) → --http1.0 etc.
+	// Non-default request-line version (http10 module) → curl transport flag:
+	// 1.0 → --http1.0, 0.9 → --http0.9 (valid curl flags), 2.0 → --http2
+	// (curl has no text-2.0 request-line mode; -r debug-token resends
+	// reproduce the exact text version byte-for-byte).
 	if bypassPayload.HTTPVersion != "" {
+		v := strings.TrimPrefix(bypassPayload.HTTPVersion, "HTTP/")
+		if v == "2.0" {
+			v = "2"
+		}
 		cmdBuf.Write(strSpace)
-		cmdBuf.WriteString("--http" + strings.TrimPrefix(bypassPayload.HTTPVersion, "HTTP/"))
+		cmdBuf.WriteString("--http" + v)
 	}
 
 	// Per-job UA (user_agent module): curl would otherwise send its own UA
