@@ -10,23 +10,16 @@ import (
 	"strings"
 
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
 )
-
-// ParsedRequest holds a full raw HTTP request imported from a --request-file.
-// It becomes the base request every bypass module mutates (issue #2, phase 2).
-type ParsedRequest struct {
-	Method  string            // HTTP method from the request line
-	RawURI  string            // origin-form request-target (path + optional query)
-	Headers []payload.Headers // imported headers (Host and Content-Length excluded)
-	Host    string            // Host header value ("" when absent)
-	Body    string            // verbatim body after the header section
-}
 
 // parseRawRequest parses a raw HTTP request captured from a proxy or editor
 // (Burp, curl -v, mitmproxy). Both CRLF and LF line endings are accepted.
 // The body is kept verbatim; the request-target must be origin-form
 // (leading /) - host and scheme come from -u/--url.
-func parseRawRequest(content string) (*ParsedRequest, error) {
+// Returns *rawhttp.ParsedRequest so the scanner can consume it without an
+// import cycle (core/cli already imports core/engine/scanner).
+func parseRawRequest(content string) (*rawhttp.ParsedRequest, error) {
 	if strings.TrimSpace(content) == "" {
 		return nil, fmt.Errorf("request file is empty")
 	}
@@ -71,7 +64,7 @@ func parseRawRequest(content string) (*ParsedRequest, error) {
 		return nil, fmt.Errorf("malformed request line %q: bad HTTP version %q", requestLine, version)
 	}
 
-	pr := &ParsedRequest{Method: method, RawURI: target, Body: body}
+	pr := &rawhttp.ParsedRequest{Method: method, RawURI: target, Body: body}
 
 	for _, line := range lines[1:] {
 		line = strings.TrimRight(line, "\r")

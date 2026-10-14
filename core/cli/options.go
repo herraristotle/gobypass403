@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
 	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
 )
 
@@ -58,10 +59,10 @@ type CliOptions struct {
 	Body   string // Resolved request body (file contents when Data is @filepath)
 
 	// Full raw request import (issue #2, phase 2)
-	RequestFile    string         // --request-file: path to a raw HTTP request file
-	ParsedRequest  *ParsedRequest // Parsed contents of RequestFile
-	methodSet      bool           // -X was explicitly provided on the command line
-	dataSet        bool           // --data was explicitly provided on the command line
+	RequestFile   string                 // --request-file: path to a raw HTTP request file
+	ParsedRequest *rawhttp.ParsedRequest // Parsed contents of RequestFile
+	methodSet     bool                   // -X was explicitly provided on the command line
+	dataSet       bool                   // --data was explicitly provided on the command line
 
 	// Output options
 	OutDir        string
