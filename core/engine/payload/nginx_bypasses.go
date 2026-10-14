@@ -60,7 +60,8 @@ func (pg *PayloadGenerator) GenerateNginxACLsBypassPayloads(targetURL string, by
 	// Base job template
 	baseJob := BypassPayload{
 		OriginalURL:  targetURL,
-		Method:       "GET",
+		Method:       pg.method,
+		Body:         pg.body,
 		Scheme:       parsedURL.Scheme,
 		Host:         parsedURL.Host,
 		BypassModule: bypassModule,
