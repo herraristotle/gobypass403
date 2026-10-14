@@ -42,6 +42,7 @@ var (
 	curlRequestTarget = []byte("--request-target")
 	curlMethodX       = []byte("-X")
 	curlHeaderH       = []byte("-H")
+	curlDataD         = []byte("-d")
 	//strColon          = []byte(":")
 	strSingleQuote = []byte("'")
 	strSpace       = []byte(" ")
@@ -267,6 +268,26 @@ func BuildCurlCommandWithOpts(bypassPayload payload.BypassPayload, clientOpts *H
 				cmdBuf.Write(strSingleQuote)
 			}
 		}
+	}
+
+	// Add request body with shell-safe single-quote escaping (' -> '\'')
+	if len(bypassPayload.Body) > 0 {
+		cmdBuf.Write(strSpace)
+		cmdBuf.Write(curlDataD)
+		cmdBuf.Write(strSpace)
+		cmdBuf.Write(strSingleQuote)
+		body := bypassPayload.Body
+		for {
+			i := strings.IndexByte(body, '\'')
+			if i == -1 {
+				cmdBuf.WriteString(body)
+				break
+			}
+			cmdBuf.WriteString(body[:i])
+			cmdBuf.WriteString(`'\''`)
+			body = body[i+1:]
+		}
+		cmdBuf.Write(strSingleQuote)
 	}
 
 	// URL construction
