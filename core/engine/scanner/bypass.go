@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"fortio.org/progressbar"
+	"github.com/slicingmelon/go-rawurlparser"
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
 	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
 	"github.com/slicingmelon/gobypass403/core/utils/helpers"
@@ -188,11 +189,40 @@ func (s *Scanner) RunAllBypasses(targetURL string) int {
 	return totalFindings
 }
 
+// effectiveTargetURL rebuilds the generation URL from an imported request
+// (--request-file, issue #2 phase 2): scheme from -u, host from the file's
+// Host header when present (else -u's host), path+query from the file's
+// request-target. Path modules then derive variants from the file's path.
+func effectiveTargetURL(targetURL string, pr *rawhttp.ParsedRequest) string {
+	parsed, err := rawurlparser.RawURLParse(targetURL)
+	if err != nil {
+		GB403Logger.Error().Msgf("Failed to parse target URL %s: %v", targetURL, err)
+		return targetURL
+	}
+	host := parsed.Host
+	if pr.Host != "" {
+		host = pr.Host
+	}
+	return parsed.Scheme + "://" + host + pr.RawURI
+}
+
 // RunBypassModule runs a specific bypass module and returns the number of findings
 func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 	if !IsValidBypassModule(bypassModule) {
 		GB403Logger.Error().Msgf("Invalid bypass module: %s\n", bypassModule)
 		return 0
+	}
+
+	// With --request-file the imported request is the base every module
+	// mutates: its request-target and Host drive generation, its method/body
+	// feed the generator (the file already carries them; -X/--data are
+	// mutually exclusive with --request-file).
+	method := s.scannerOpts.Method
+	body := s.scannerOpts.Body
+	if pr := s.scannerOpts.ParsedRequest; pr != nil {
+		method = pr.Method
+		body = pr.Body
+		targetURL = effectiveTargetURL(targetURL, pr)
 	}
 
 	pg := payload.NewPayloadGenerator(payload.PayloadGeneratorOptions{
@@ -201,11 +231,25 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 		ReconCache:   s.scannerOpts.ReconCache,
 		SpoofHeader:  s.scannerOpts.SpoofHeader,
 		SpoofIP:      s.scannerOpts.SpoofIP,
-		Method:       s.scannerOpts.Method,
-		Body:         s.scannerOpts.Body,
+		Method:       method,
+		Body:         body,
 	})
 
 	allJobs := pg.Generate()
+
+	// Inject the imported request's headers into every job (Host and
+	// Content-Length are excluded at parse time: Host comes from the
+	// effective URL, Content-Length is recomputed by the builder).
+	// Payload-level headers ride debug tokens and -r resends with full
+	// fidelity, unlike client-level custom headers.
+	if pr := s.scannerOpts.ParsedRequest; pr != nil && len(pr.Headers) > 0 {
+		for i := range allJobs {
+			headers := make([]payload.Headers, 0, len(allJobs[i].Headers)+len(pr.Headers))
+			headers = append(headers, allJobs[i].Headers...)
+			headers = append(headers, pr.Headers...)
+			allJobs[i].Headers = headers
+		}
+	}
 
 	// Filter unique payloads based on RawURI
 	allJobs = FilterUniqueBypassPayloads(allJobs, bypassModule)
