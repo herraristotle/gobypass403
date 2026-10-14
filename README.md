@@ -41,6 +41,9 @@ A powerful WAF (HTTP 403/401) and URL parser bypass tool developed in Go, design
   - [15. headers\_host](#15-headers_host)
   - [16. headers\_hop\_by\_hop](#16-headers_hop_by_hop)
   - [17. api\_versions](#17-api_versions)
+  - [18. http10](#18-http10)
+  - [19. headers\_method](#19-headers_method)
+  - [20. user\_agent](#20-user_agent)
 - [Findings](#findings)
   - [Findings Summary](#findings-summary)
   - [Full Findings Database](#full-findings-database)
@@ -810,6 +813,37 @@ unfiltered. Two payloads are sent — the plain downgrade (the classic
 Findings render with `curl --http1.0` in the PoC column, and the request
 version is preserved in debug tokens, so `-r` resends reproduce the
 downgraded request byte-exact. The module is enabled by default.
+
+## 19. headers_method
+
+The `headers_method` module sends method-override headers on the original
+request-target: `X-HTTP-Method`, `X-HTTP-Method-Override` and
+`X-Method-Override`, each paired with one of seven method values
+(`GET POST PUT PATCH DELETE HEAD OPTIONS`). Frameworks that honor these
+headers run the request as the override method while the front proxy still
+sees the original verb, slipping past method-based ACLs (bup
+`http_headers_method` parity — 21 payloads per target).
+
+```bash
+./gobypass403 -u https://target.example/admin -m headers_method
+```
+
+## 20. user_agent
+
+The `user_agent` module rotates the `User-Agent` header, sending one
+payload per entry in `payloads/internal_user_agents.lst` (45 agents:
+crawlers such as Googlebot/CCBot/DuckDuckBot, legacy browsers, mobile and
+library clients like `Go-http-client/1.1` and `Java/1.8.0_202`). WAFs and
+IP-based ACLs frequently whitelist crawler or legacy UAs. The UA travels
+as a dedicated token field, so debug-token resends (`-r`) reproduce the
+exact agent, and findings render with `curl -A '<ua>'` in the PoC column.
+
+```bash
+./gobypass403 -u https://target.example/admin -m user_agent
+```
+
+Run once with `--update-payloads` after upgrading to pick up wordlist
+additions. The module is enabled by default.
 
 # Findings
 
