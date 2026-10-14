@@ -45,6 +45,23 @@ func (pg *PayloadGenerator) GenerateHeadersHostPayloads(targetURL string, bypass
 		pathAndQuery += "?" + parsedURL.Query
 	}
 
+	// Host-header removal payload (addendum 3 Phase D item 10, HackTricks
+	// "remove the Host header"): emitted unconditionally, BEFORE the recon
+	// gate — it needs no IP data, and front proxies/AACLs that key on the
+	// Host header can misroute a request that arrives without one.
+	omitJob := BypassPayload{
+		OriginalURL:  targetURL,
+		Method:       pg.method,
+		Body:         pg.body,
+		Scheme:       parsedURL.Scheme,
+		Host:         parsedURL.Host,
+		RawURI:       pathAndQuery,
+		BypassModule: bypassModule,
+		OmitHost:     true,
+	}
+	omitJob.PayloadToken = GeneratePayloadToken(omitJob)
+	allJobs = append(allJobs, omitJob)
+
 	// Get IP information from cache
 	probeCacheResult, err := pg.reconCache.Get(parsedURL.Hostname)
 	if err != nil || probeCacheResult == nil {

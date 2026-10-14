@@ -213,7 +213,8 @@ func BuildRawRequest(httpclient *HTTPClient, bypassPayload payload.BypassPayload
 	}
 
 	// PRIORITY 3: Add default Host header if not provided
-	if !hasHostHeader {
+	// (skipped for the headers_host OmitHost variant — Host removal)
+	if !hasHostHeader && !bypassPayload.OmitHost {
 		bb.B = append(bb.B, strHostColon...)
 		bb.B = append(bb.B, bypassPayload.Host...)
 		bb.B = append(bb.B, strCRLF...)

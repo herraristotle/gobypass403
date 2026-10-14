@@ -193,6 +193,7 @@ type BypassPayload struct {
 	PayloadToken string    // always gets updated
 	HTTPVersion  string    // optional request-line version (e.g. "HTTP/1.0"); empty means HTTP/1.1 default
 	UserAgent    string    // optional per-job User-Agent (user_agent module); empty means default UA
+	OmitHost     bool      // headers_host variant: emit NO Host header (false = default)
 }
 
 type SeedData struct {
@@ -395,6 +396,12 @@ func GeneratePayloadToken(job BypassPayload) string {
 			bb.B = append(bb.B, byte(uaLen))
 		}
 		bb.Write(bytesutil.ToUnsafeBytes(job.UserAgent))
+	}
+
+	// Add OmitHost flag — only when true (optional field 10), so tokens for
+	// all other payloads stay byte-identical.
+	if job.OmitHost {
+		bb.B = append(bb.B, 10, 1, 1) // field type, length, true
 	}
 
 	// Compress and encode the buffer contents
@@ -621,6 +628,12 @@ func DecodePayloadToken(token string) (BypassPayload, error) {
 				result.UserAgent = string(bb[pos : pos+fieldLen])
 				pos += fieldLen
 			}
+
+		case 10: // OmitHost (optional; absent = false)
+			if fieldLen >= 1 && bb[pos] == 1 {
+				result.OmitHost = true
+			}
+			pos += fieldLen
 		}
 	}
 	return result, nil

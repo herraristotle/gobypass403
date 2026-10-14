@@ -272,6 +272,15 @@ func BuildCurlCommandWithOpts(bypassPayload payload.BypassPayload, clientOpts *H
 		cmdBuf.Write(strSingleQuote)
 	}
 
+	// Host removal (headers_host OmitHost): empty value makes curl omit
+	// the header entirely
+	if bypassPayload.OmitHost {
+		cmdBuf.Write(strSpace)
+		cmdBuf.Write(curlHeaderH)
+		cmdBuf.Write(strSpace)
+		cmdBuf.WriteString("'Host:'")
+	}
+
 	// Add custom headers from client options
 	if clientOpts != nil && len(clientOpts.CustomHTTPHeaders) > 0 {
 		for _, header := range clientOpts.CustomHTTPHeaders {
