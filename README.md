@@ -39,6 +39,8 @@ A powerful WAF (HTTP 403/401) and URL parser bypass tool developed in Go, design
   - [13. headers\_port](#13-headers_port)
   - [14. headers\_url](#14-headers_url)
   - [15. headers\_host](#15-headers_host)
+  - [16. headers\_hop\_by\_hop](#16-headers_hop_by_hop)
+  - [17. api\_versions](#17-api_versions)
 - [Findings](#findings)
   - [Findings Summary](#findings-summary)
   - [Full Findings Database](#full-findings-database)
@@ -102,7 +104,7 @@ Usage:
   -shf, -substitute-hosts-file
         File containing a list of hosts to substitute target URL's hostname (mostly used in CDN bypasses by providing a list of CDNs)
   -m, -module
-        Bypass module (all,path_prefix,mid_paths,end_paths,http_methods,case_substitution,char_encode,nginx_bypasses,haproxy_bypasses,unicode_path_normalization,unicode_path_truncation,headers_scheme,headers_ip,headers_port,headers_url,headers_host). Supports glob patterns with * (e.g., headers*,*bypass*) (Default: all)
+        Bypass module (all,path_prefix,mid_paths,end_paths,http_methods,case_substitution,char_encode,nginx_bypasses,haproxy_bypasses,unicode_path_normalization,unicode_path_truncation,headers_scheme,headers_ip,headers_port,headers_url,headers_host,headers_hop_by_hop,api_versions). Supports glob patterns with * (e.g., headers*,*bypass*) (Default: all)
   -em, -exclude-module
         Exclude specific bypass modules. Supports glob patterns with * (e.g., -em unicode*,*experimental). Takes precedence over -m
   -o, -outdir
@@ -151,6 +153,8 @@ Usage:
         Add more headers used to spoof IPs (example: X-SecretIP-Header,X-GO-IP)
   -spoof-ip
         Add more spoof IPs (example: 10.10.20.20,172.16.30.10)
+  -spoof-prefix
+        Add more path prefixes tested by the api_versions module (example: /internal,/v2beta)
   -fr, -follow-redirects
         Follow HTTP redirects
   -rbps, -response-body-preview-size
@@ -751,6 +755,44 @@ This module is especially powerful for:
 - Virtual host confusion attacks
 - DNS-based access control evasion
 - Load balancer and reverse proxy misconfigurations
+
+## 16. headers_hop_by_hop
+
+The `headers_hop_by_hop` module tests the RFC 7230 hop-by-hop `Connection`
+header trick: for each well-known auth header (`Authorization`, `Cookie`,
+`X-Api-Key`, `X-Auth-Token`, `X-Access-Token`), it sends the header with the
+value `bypass` while listing it in `Connection`. Proxies honoring Connection
+list semantics strip the named header before forwarding, which can remove an
+internal-only credential check or ACL-enforcing hop sitting between the
+proxy and the origin.
+
+The module sends exactly five payloads per target — the header pairing is
+the technique, so the list is intentionally kept verbatim rather than
+expanded.
+
+## 17. api_versions
+
+The `api_versions` module tests API version routing discrepancies with two
+sub-techniques:
+
+1. **Prefix injection** — prepends semantic path prefixes (`/v1`–`/v9`,
+   `/api`, `/api/v1`–`/api/v4`) to the original path. Some servers protect
+   `/admin` but route `/v2/admin` or `/api/admin` through different (often
+   unprotected) middleware.
+2. **Version swap** — when the path contains a version segment (e.g.
+   `/api/v1/users`), replaces it with each alternative (`v1`–`v9`, `v1.1`,
+   `v2.0`); identity swaps are skipped. A route registered under another
+   API version may be unprotected.
+
+Custom prefixes relevant to the target (e.g. an internal API namespace) can
+be added with the `-spoof-prefix` flag:
+
+```bash
+./gobypass403 -u https://target.com/admin -m api_versions -spoof-prefix /internal,/v2beta
+```
+
+Values are comma-separated, normalized (leading slash ensured, trailing
+slash stripped) and deduplicated against the built-in wordlist.
 
 # Findings
 

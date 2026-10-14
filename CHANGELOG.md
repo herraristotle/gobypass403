@@ -1,5 +1,11 @@
 # Unreleased
 
+- **Added unKover technique parity** — four techniques from Brute Logic's unKover (audited against v1.3) that gobypass403 did not cover:
+  - Lowercase HTTP method variants: the `http_methods` module now emits a lowercase twin for every method in its list (36 → 72 payloads, plus POST query-as-body variants on URLs with query strings), since some allowlists compare methods case-insensitively. This is the only payload-count change to an existing module.
+  - New `headers_hop_by_hop` module (5 payloads): pairs well-known auth headers (`Authorization`, `Cookie`, `X-Api-Key`, `X-Auth-Token`, `X-Access-Token`) with `Connection: <header>` per RFC 7230 hop-by-hop stripping semantics.
+  - New `api_versions` module: prefix injection (`/v1`–`/v9`, `/api`, `/api/v1`–`/api/v4`) and version-swap (`v1`–`v9`, `v1.1`, `v2.0`) sub-techniques for API version routing discrepancies.
+  - New `-spoof-prefix` flag: comma-separated custom path prefixes for `api_versions` (example: `-spoof-prefix /internal,/v2beta`), following the `-spoof-header`/`-spoof-ip` flag family.
+  - Both new modules are enabled by default; select them individually with `-m headers_hop_by_hop` / `-m api_versions`.
 - **Added custom HTTP method and request body support** ([issue #2](https://github.com/slicingmelon/gobypass403/issues/2)) — new `-X/--request` and `--data` flags let you test POST (or any method) requests with a body. All bypass modules now use your method and body as the base request instead of hardcoded GET.
   - `-X POST` / `-X PUT` / any valid HTTP token; validated against RFC 7230 to block request-line smuggling.
   - `--data 'raw body'` or `--data @body.json` (body read verbatim from file). No Content-Type is added automatically — pass `-H "Content-Type: ..."` yourself, matching the tool's raw-request philosophy.
