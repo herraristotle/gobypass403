@@ -42,6 +42,8 @@ type ScannerOpts struct {
 	DisableStreamResponseBody bool
 	DisableProgressBar        bool
 	ResendRequest             string
+	Method                    string // HTTP method for base requests (default GET)
+	Body                      string // Request body for base requests (default none)
 	ReconCache                *recon.ReconCache
 }
 

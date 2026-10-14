@@ -99,6 +99,8 @@ func (r *Runner) Initialize() error {
 		DisableStreamResponseBody: r.RunnerOptions.DisableStreamResponseBody,
 		DisableProgressBar:        r.RunnerOptions.DisableProgressBar,
 		ResendRequest:             r.RunnerOptions.ResendRequest,
+		Method:                    r.RunnerOptions.Method,
+		Body:                      r.RunnerOptions.Body,
 
 		ReconCache: r.UrlRecon.reconService.GetReconCache(),
 	}
