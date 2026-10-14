@@ -2,6 +2,7 @@ package payload
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/slicingmelon/go-rawurlparser"
 	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
@@ -12,6 +13,11 @@ GenerateHTTPMethodsPayloads generates payloads by testing various HTTP methods a
 the target URL.
 
 It reads a list of HTTP methods (standard and non-standard) from internal_http_methods.lst.
+
+For each method in the list, a lowercase twin variant is also generated
+(unKover `method_case` parity — some allowlists compare methods
+case-insensitively and match only the canonical casing). All other payload
+shapes below apply identically to both casings:
 
 For each method in the list, it generates a payload:
  1. **Base Case:** Uses the specified method with the original URL's path and query string.
@@ -69,26 +75,43 @@ func (pg *PayloadGenerator) GenerateHTTPMethodsPayloads(targetURL string, bypass
 		"DELETE":    {},
 	}
 
-	for _, method := range httpMethods {
-		// Skip empty methods
-		if method == "" {
+	// Expand the list with lowercase twins (unKover method_case parity),
+	// deduped so a lowercase entry already in the list is not emitted twice.
+	expandedMethods := make([]string, 0, len(httpMethods)*2)
+	seenMethods := make(map[string]struct{}, len(httpMethods)*2)
+	for _, m := range httpMethods {
+		if m == "" {
 			continue
 		}
+		if _, seen := seenMethods[m]; !seen {
+			seenMethods[m] = struct{}{}
+			expandedMethods = append(expandedMethods, m)
+		}
+		lower := strings.ToLower(m)
+		if _, seen := seenMethods[lower]; !seen {
+			seenMethods[lower] = struct{}{}
+			expandedMethods = append(expandedMethods, lower)
+		}
+	}
 
+	for _, method := range expandedMethods {
+		// Methods that require Content-Length are keyed on the canonical
+		// (uppercase) form so lowercase twins get identical treatment.
+		canonical := strings.ToUpper(method)
 		// Basic case: method with original path+query
 		job := baseJob
 		job.Method = method
 		job.RawURI = path + query
 
 		// Add Content-Length header if needed
-		if _, needsContentLength := requiresContentLength[method]; needsContentLength {
+		if _, needsContentLength := requiresContentLength[canonical]; needsContentLength {
 			job.Headers = append(job.Headers, Headers{
 				Header: "Content-Length",
 				Value:  "0",
 			})
 
 			// For POST requests, create an additional variant with query in body
-			if method == "POST" && parsedURL.Query != "" {
+			if canonical == "POST" && parsedURL.Query != "" {
 				// Create a job with path only (no query) for POST
 				postJob := baseJob
 				postJob.Method = method
