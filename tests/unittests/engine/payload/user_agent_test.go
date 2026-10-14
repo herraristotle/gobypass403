@@ -106,23 +106,23 @@ func TestUserAgentTokenRoundtrip(t *testing.T) {
 	}
 }
 
-// TestUserAgentRegistered pins registration (append-only registry: after
-// headers_method, which in turn must sit after http10).
+// TestUserAgentRegistered pins registration (append-only registry chain:
+// http10 < headers_method < user_agent < param_manipulation — later
+// modules may append after user_agent).
 func TestUserAgentRegistered(t *testing.T) {
-	last := ""
-	for _, m := range payload.BypassModulesRegistry {
-		last = m
-	}
-	if last != "user_agent" {
-		t.Errorf("last registry entry = %q, want user_agent appended after headers_method", last)
-	}
-	// Cross-check the chain: http10 < headers_method < user_agent
 	idx := map[string]int{}
 	for i, m := range payload.BypassModulesRegistry {
 		idx[m] = i
 	}
-	if !(idx["http10"] < idx["headers_method"] && idx["headers_method"] < idx["user_agent"]) {
-		t.Errorf("registry order broken: http10=%d headers_method=%d user_agent=%d",
-			idx["http10"], idx["headers_method"], idx["user_agent"])
+	for _, m := range []string{"http10", "headers_method", "user_agent", "param_manipulation"} {
+		if _, ok := idx[m]; !ok {
+			t.Fatalf("module %q not in payload.BypassModulesRegistry", m)
+		}
+	}
+	if !(idx["http10"] < idx["headers_method"] &&
+		idx["headers_method"] < idx["user_agent"] &&
+		idx["user_agent"] < idx["param_manipulation"]) {
+		t.Errorf("registry order broken: http10=%d headers_method=%d user_agent=%d param_manipulation=%d",
+			idx["http10"], idx["headers_method"], idx["user_agent"], idx["param_manipulation"])
 	}
 }

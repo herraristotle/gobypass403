@@ -44,6 +44,7 @@ var BypassModulesRegistry = []string{
 	"http10",
 	"headers_method",
 	"user_agent",
+	"param_manipulation",
 }
 
 var (
@@ -162,6 +163,8 @@ func (pg *PayloadGenerator) Generate() []BypassPayload {
 		return pg.GenerateHeadersMethodPayloads(pg.targetURL, pg.bypassModule)
 	case "user_agent":
 		return pg.GenerateUserAgentPayloads(pg.targetURL, pg.bypassModule)
+	case "param_manipulation":
+		return pg.GenerateParamManipulationPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_normalization":
 		return pg.GenerateUnicodePathNormalizationsPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_truncation":
