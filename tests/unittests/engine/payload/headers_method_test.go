@@ -77,13 +77,23 @@ func TestHeadersMethodGeneration(t *testing.T) {
 	}
 }
 
-// TestHeadersMethodRegistered pins registration (append-only registry).
+// TestHeadersMethodRegistered pins registration (append-only registry:
+// after http10; later modules may append after it).
 func TestHeadersMethodRegistered(t *testing.T) {
-	last := ""
-	for _, m := range payload.BypassModulesRegistry {
-		last = m
+	idx := -1
+	h10Idx := -1
+	for i, m := range payload.BypassModulesRegistry {
+		if m == "headers_method" {
+			idx = i
+		}
+		if m == "http10" {
+			h10Idx = i
+		}
 	}
-	if last != "headers_method" {
-		t.Errorf("last registry entry = %q, want headers_method appended after http10", last)
+	if idx == -1 {
+		t.Fatal("module \"headers_method\" not in payload.BypassModulesRegistry")
+	}
+	if idx < h10Idx {
+		t.Errorf("headers_method index %d must come after http10 (append-only), got http10 at %d", idx, h10Idx)
 	}
 }

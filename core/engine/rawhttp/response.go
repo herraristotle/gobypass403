@@ -227,6 +227,15 @@ func BuildCurlCommandWithOpts(bypassPayload payload.BypassPayload, clientOpts *H
 		cmdBuf.WriteString("--http" + strings.TrimPrefix(bypassPayload.HTTPVersion, "HTTP/"))
 	}
 
+	// Per-job UA (user_agent module): curl would otherwise send its own UA
+	if bypassPayload.UserAgent != "" {
+		cmdBuf.Write(strSpace)
+		cmdBuf.WriteString("-A ")
+		cmdBuf.Write(strSingleQuote)
+		cmdBuf.WriteString(bypassPayload.UserAgent)
+		cmdBuf.Write(strSingleQuote)
+	}
+
 	// Add --request-target if RawURI doesn't start with /
 	if needsRequestTarget {
 		cmdBuf.Write(strSpace)

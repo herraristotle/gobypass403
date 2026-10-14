@@ -43,6 +43,7 @@ var BypassModulesRegistry = []string{
 	"api_versions",
 	"http10",
 	"headers_method",
+	"user_agent",
 }
 
 var (
@@ -159,6 +160,8 @@ func (pg *PayloadGenerator) Generate() []BypassPayload {
 		return pg.GenerateHTTP10Payloads(pg.targetURL, pg.bypassModule)
 	case "headers_method":
 		return pg.GenerateHeadersMethodPayloads(pg.targetURL, pg.bypassModule)
+	case "user_agent":
+		return pg.GenerateUserAgentPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_normalization":
 		return pg.GenerateUnicodePathNormalizationsPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_truncation":
@@ -189,6 +192,7 @@ type BypassPayload struct {
 	BypassModule string    // always gets updated
 	PayloadToken string    // always gets updated
 	HTTPVersion  string    // optional request-line version (e.g. "HTTP/1.0"); empty means HTTP/1.1 default
+	UserAgent    string    // optional per-job User-Agent (user_agent module); empty means default UA
 }
 
 type SeedData struct {
@@ -377,6 +381,20 @@ func GeneratePayloadToken(job BypassPayload) string {
 		bb.B = append(bb.B, 8) // field type for HTTP version (8)
 		bb.B = append(bb.B, byte(len(job.HTTPVersion)))
 		bb.Write(bytesutil.ToUnsafeBytes(job.HTTPVersion))
+	}
+
+	// Add UserAgent field — only when set (optional field 9), so tokens for
+	// all other modules stay byte-identical.
+	if job.UserAgent != "" {
+		uaLen := len(job.UserAgent)
+		bb.B = append(bb.B, 9) // field type for user agent (9)
+		if uaLen > 255 {
+			// Long UA (crawler strings can exceed 255): 2-byte length like body
+			bb.B = append(bb.B, 255, byte(uaLen>>8), byte(uaLen&0xFF))
+		} else {
+			bb.B = append(bb.B, byte(uaLen))
+		}
+		bb.Write(bytesutil.ToUnsafeBytes(job.UserAgent))
 	}
 
 	// Compress and encode the buffer contents
@@ -588,6 +606,21 @@ func DecodePayloadToken(token string) (BypassPayload, error) {
 		case 8: // HTTPVersion (optional; absent = HTTP/1.1 default)
 			result.HTTPVersion = string(bb[pos : pos+fieldLen])
 			pos += fieldLen
+
+		case 9: // UserAgent (optional; absent = default UA)
+			if fieldLen == 255 && pos+2 <= len(bb) {
+				highByte := int(bb[pos])
+				lowByte := int(bb[pos+1])
+				actualLen := (highByte << 8) | lowByte
+				pos += 2
+				if pos+actualLen <= len(bb) {
+					result.UserAgent = string(bb[pos : pos+actualLen])
+					pos += actualLen
+				}
+			} else {
+				result.UserAgent = string(bb[pos : pos+fieldLen])
+				pos += fieldLen
+			}
 		}
 	}
 	return result, nil

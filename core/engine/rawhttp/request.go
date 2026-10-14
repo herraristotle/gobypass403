@@ -20,6 +20,7 @@ import (
 
 var (
 	strUserAgentHeader = "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+	strUserAgentPrefix = "User-Agent: "
 )
 
 // Pre-defined byte slices for common strings to reduce allocations
@@ -220,7 +221,13 @@ func BuildRawRequest(httpclient *HTTPClient, bypassPayload payload.BypassPayload
 
 	// PRIORITY 4: Add standard headers if not overridden by CLI
 	if clientOpts.HeaderOverrides == nil || !clientOpts.HeaderOverrides["user-agent"] {
-		bb.B = append(bb.B, strUserAgentHeader...)
+		if bypassPayload.UserAgent != "" {
+			// Per-job UA (user_agent module): replace the default constant
+			bb.B = append(bb.B, strUserAgentPrefix...)
+			bb.B = append(bb.B, bypassPayload.UserAgent...)
+		} else {
+			bb.B = append(bb.B, strUserAgentHeader...)
+		}
 		bb.B = append(bb.B, strCRLF...)
 	}
 	if clientOpts.HeaderOverrides == nil || !clientOpts.HeaderOverrides["accept"] {
