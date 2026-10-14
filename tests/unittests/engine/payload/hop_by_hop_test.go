@@ -38,6 +38,9 @@ func TestHopByHopPayloads(t *testing.T) {
 		if j.BypassModule != moduleName {
 			t.Errorf("Payload %s: BypassModule = %q", h, j.BypassModule)
 		}
+		if j.Method != "GET" {
+			t.Errorf("Payload %s: Method = %q, want base method (GET)", h, j.Method)
+		}
 
 		if len(j.Headers) != 2 {
 			t.Fatalf("Payload %s: expected exactly 2 headers, got %+v", h, j.Headers)

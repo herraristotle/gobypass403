@@ -37,6 +37,10 @@ var BypassModulesRegistry = []string{
 	"unicode_path_normalization",
 	"unicode_path_truncation",
 	"unicode_path_experimental",
+	// Appended (never inserted) — registry order is baked into debug-token
+	// module bytes; new modules get new indices at the end.
+	"headers_hop_by_hop",
+	"api_versions",
 }
 
 var (

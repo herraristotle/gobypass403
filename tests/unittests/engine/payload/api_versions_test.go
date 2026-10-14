@@ -42,6 +42,9 @@ func TestAPIVersionsPrefixPayloads(t *testing.T) {
 		if j.BypassModule != moduleName {
 			t.Errorf("Payload %q: BypassModule = %q", j.RawURI, j.BypassModule)
 		}
+		if j.Method != "GET" {
+			t.Errorf("Payload %q: Method = %q, want base method (GET)", j.RawURI, j.Method)
+		}
 	}
 	for _, p := range expectedVersionPrefixes {
 		want := p + "/admin/panel?x=1"
@@ -136,6 +139,24 @@ func TestAPIVersionsSpoofPrefix(t *testing.T) {
 		}
 		if strings.Contains(uri, "//") {
 			t.Errorf("Double slash in RawURI %q (normalization failed)", uri)
+		}
+	}
+}
+
+// TestUnKoverModulesRegistered pins registration in BypassModulesRegistry —
+// the scanner-side validation used by RunBypassModule (a wire smoke caught
+// the first omission of this third registry).
+func TestUnKoverModulesRegistered(t *testing.T) {
+	for _, module := range []string{"headers_hop_by_hop", "api_versions"} {
+		found := false
+		for _, m := range payload.BypassModulesRegistry {
+			if m == module {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("module %q not in payload.BypassModulesRegistry", module)
 		}
 	}
 }

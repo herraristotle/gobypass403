@@ -97,6 +97,8 @@ func (pg *PayloadGenerator) GenerateAPIVersionPayloads(targetURL string, bypassM
 
 	baseJob := BypassPayload{
 		OriginalURL:  targetURL,
+		Method:       pg.method,
+		Body:         pg.body,
 		Scheme:       parsedURL.Scheme,
 		Host:         parsedURL.Host,
 		BypassModule: bypassModule,

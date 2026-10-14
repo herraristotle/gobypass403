@@ -42,6 +42,8 @@ func (pg *PayloadGenerator) GenerateHeadersHopByHopPayloads(targetURL string, by
 
 	baseJob := BypassPayload{
 		OriginalURL:  targetURL,
+		Method:       pg.method,
+		Body:         pg.body,
 		Scheme:       parsedURL.Scheme,
 		Host:         parsedURL.Host,
 		RawURI:       rawURI,
