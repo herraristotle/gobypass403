@@ -44,6 +44,7 @@ A powerful WAF (HTTP 403/401) and URL parser bypass tool developed in Go, design
   - [18. http10](#18-http10)
   - [19. headers\_method](#19-headers_method)
   - [20. user\_agent](#20-user_agent)
+  - [21. param\_manipulation](#21-param_manipulation)
 - [Findings](#findings)
   - [Findings Summary](#findings-summary)
   - [Full Findings Database](#full-findings-database)
@@ -753,6 +754,12 @@ Key features include:
      - CNAME in both URL host and Host header
      - Recursive domain suffix testing (e.g., sub.domain.com → domain.com)
 
+4. Host-header removal:
+   - One unconditional payload (needs no recon data) that emits **no
+     `Host:` header at all** (HackTricks "remove the Host header") — ACLs
+     keyed on the Host header can misroute host-less requests
+   - Reproduces in curl as `-H 'Host:'` (empty value omits the header)
+
 This module is especially powerful for:
 - Content Delivery Network (CDN) bypass attempts
 - Virtual host confusion attacks
@@ -799,20 +806,27 @@ slash stripped) and deduplicated against the built-in wordlist.
 
 ## 18. http10
 
-The `http10` module tests HTTP/1.0 protocol downgrade bypasses: it re-sends
-the exact baseline request with an `HTTP/1.0` request line instead of the
-default `HTTP/1.1`. Reverse proxies in a chain sometimes apply their ACL
-only to HTTP/1.1 request parsing, so a 1.0 request reaches the origin
-unfiltered. Two payloads are sent — the plain downgrade (the classic
-`curl --http1.0` probe) and a `Connection: close` companion.
+The `http10` module tests request-line **version confusion**: it re-sends
+the exact baseline request with a non-default version token — `HTTP/1.0`
+(the classic `curl --http1.0` probe; reverse proxies in a chain sometimes
+apply their ACL only to HTTP/1.1 parsing), `HTTP/0.9` and `HTTP/2.0`.
+Probed against the official testbed: HTTP/1.0 bypasses
+`:8081/access/rproxy/protocol10` (unKover parity, 200/37 bytes), HTTP/2.0
+is accepted where HTTP/1.1 is (200/403 respectively), and HTTP/0.9 forces
+a version-parsing differential (400 vs the 403 baseline on nginx).
+Each version ships plain plus a `Connection: close` companion (6 payloads).
 
 ```bash
 ./gobypass403 -u http://target.internal:8081/admin -m http10
 ```
 
-Findings render with `curl --http1.0` in the PoC column, and the request
-version is preserved in debug tokens, so `-r` resends reproduce the
-downgraded request byte-exact. The module is enabled by default.
+Findings render `--http1.0` / `--http0.9` / `--http2` in the PoC column
+(curl has no text-`HTTP/2.0` request-line mode; `-r` debug-token resends
+are byte-exact), and the version is preserved in debug tokens. The module
+keeps its historical `http10` name — registry order is baked into token
+bytes and `-m http10` is user-facing. Real HTTP/2/h2c transport probes are
+out of scope: the client stack is HTTP/1.x-only (no HPACK/ALPN/framing).
+The module is enabled by default.
 
 ## 19. headers_method
 
@@ -844,6 +858,27 @@ exact agent, and findings render with `curl -A '<ua>'` in the PoC column.
 
 Run once with `--update-payloads` after upgrading to pick up wordlist
 additions. The module is enabled by default.
+
+## 21. param_manipulation
+
+The `param_manipulation` module manipulates the target's query string —
+pure query-layer, request-target only (HackTricks "Parameter
+Manipulation"). For a target with a query it generates: **mutate** (each
+value replaced by the boundary set `-234`, `0`, `99999999`, plus numeric
+increment `id=123→124`), **remove** (each parameter dropped individually),
+**reorder** (order reversed) and **add** (`&<name>=true` for every entry
+in `payloads/internal_param_names.lst` — 6,452 names seeded from
+Parallax's `parameters.txt`). Queryless targets get the add-variants as
+`?<name>=true`. Query pairs are rebuilt from the raw bytes — never
+re-encoded — so byte-level oddities in the original query survive into
+every payload.
+
+```bash
+./gobypass403 -u 'https://target.example/admin?id=123' -m param_manipulation
+```
+
+Roughly 6,460 payloads for a queryless target — comparable to `path_prefix`
+scale. Enabled by default.
 
 # Findings
 
