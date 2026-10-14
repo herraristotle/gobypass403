@@ -356,6 +356,7 @@ func (s *Scanner) ResendRequestFromToken(debugToken string, resendCount int) ([]
 		Host:         tokenData.Host,
 		RawURI:       tokenData.RawURI,
 		Headers:      tokenData.Headers,
+		Body:         tokenData.Body,
 		BypassModule: tokenData.BypassModule,
 	}
 

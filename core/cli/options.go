@@ -268,6 +268,13 @@ func (o *CliOptions) validate() error {
 		for _, h := range data.Headers {
 			GB403Logger.PrintYellow("  %s: %s\n", h.Header, h.Value)
 		}
+		if data.Body != "" {
+			bodyPreview := data.Body
+			if len(bodyPreview) > 120 {
+				bodyPreview = bodyPreview[:120] + "..."
+			}
+			GB403Logger.PrintYellow("Body: %q\n", bodyPreview)
+		}
 		GB403Logger.PrintYellow("Bypass Module: %s\n\n", data.BypassModule)
 	}
 
