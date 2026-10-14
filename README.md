@@ -135,6 +135,12 @@ Usage:
         Filter results by maximum Content-Length (example: -max-cl 5000)
   -H, -header
         Custom HTTP header (example: -H "X-My-Header: value"), can be used multiple times
+  -X, -request
+        HTTP method used for base requests, applied by all bypass modules (example: -X POST) (Default: GET)
+  -data
+        Request body sent verbatim with base requests; a leading @ reads the body from a file (example: --data 'user=admin', --data @body.json). No Content-Type is added automatically, use -H
+  -request-file
+        File containing one raw HTTP request (request line, headers, body) used as the base request for all modules; cannot be combined with -X/--request or --data. -u still supplies scheme/port (example: --request-file captured.req)
   -sc, -strict-scheme
         Only test URLs with the original scheme from input (prevents auto-expansion to http/https) (Default: false)
   -http2
@@ -170,6 +176,22 @@ Standard command(s):
 gobypass403 -u "https://go-test-webapp.com/admin" -mc "200"
 gobypass403 -u "https://go-test-webapp.com/admin" -mc "200,500" -cr 10
 gobypass403 -u "https://go-test-webapp.com/admin" -mc "mid_paths,nginx_bypasses,headers_ip" -cr 20 -mct "application/json,image/png"
+
+# Test POST (or any method) requests with a body - all modules use your method/body
+# as the base request. Add Content-Type yourself via -H if needed.
+gobypass403 -u "https://go-test-webapp.com/admin" -X POST --data 'user=admin&role=root' -H "Content-Type: application/x-www-form-urlencoded" -mc "200"
+gobypass403 -u "https://go-test-webapp.com/api/v1/users" -X POST --data @create_user.json -H "Content-Type: application/json" -mc "200"
+
+# Or scan a full captured request (e.g. from Burp) straight from a file - method,
+# path, headers and body all come from the file; -u only supplies scheme/port.
+cat > captured.req <<'EOF'
+POST /admin/config/users?debug=1 HTTP/1.1
+Host: go-test-webapp.com
+Content-Type: application/json
+
+{"user":"admin","role":"root"}
+EOF
+gobypass403 -u "https://go-test-webapp.com:443/x" --request-file captured.req -mc "200"
 ```
 
 Using a list of target URLs:

@@ -84,6 +84,8 @@ type PayloadGenerator struct {
 	reconCache   *recon.ReconCache
 	spoofHeader  string
 	spoofIP      string
+	method       string
+	body         string
 }
 
 type PayloadGeneratorOptions struct {
@@ -92,15 +94,23 @@ type PayloadGeneratorOptions struct {
 	ReconCache   *recon.ReconCache
 	SpoofHeader  string
 	SpoofIP      string
+	Method       string // HTTP method for base requests; empty means GET
+	Body         string // Request body for base requests; empty means none
 }
 
 func NewPayloadGenerator(opts PayloadGeneratorOptions) *PayloadGenerator {
+	method := opts.Method
+	if method == "" {
+		method = "GET"
+	}
 	return &PayloadGenerator{
 		targetURL:    opts.TargetURL,
 		bypassModule: opts.BypassModule,
 		reconCache:   opts.ReconCache,
 		spoofHeader:  opts.SpoofHeader,
 		spoofIP:      opts.SpoofIP,
+		method:       method,
+		body:         opts.Body,
 	}
 }
 

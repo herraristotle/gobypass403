@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/slicingmelon/go-rawurlparser"
+	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
 	"github.com/slicingmelon/gobypass403/core/engine/recon"
 	GB403ErrorHandler "github.com/slicingmelon/gobypass403/core/utils/error"
 	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
@@ -42,6 +43,9 @@ type ScannerOpts struct {
 	DisableStreamResponseBody bool
 	DisableProgressBar        bool
 	ResendRequest             string
+	Method                    string                 // HTTP method for base requests (default GET)
+	Body                      string                 // Request body for base requests (default none)
+	ParsedRequest             *rawhttp.ParsedRequest // Base request imported via --request-file (issue #2, phase 2)
 	ReconCache                *recon.ReconCache
 }
 

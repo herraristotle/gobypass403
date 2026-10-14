@@ -23,7 +23,8 @@ func (pg *PayloadGenerator) GenerateDumbCheckPayload(targetURL string, bypassMod
 	// Just one job with the original URL
 	job := BypassPayload{
 		OriginalURL:  targetURL,
-		Method:       "GET",
+		Method:       pg.method,
+		Body:         pg.body,
 		Scheme:       parsedURL.Scheme,
 		Host:         parsedURL.Host,
 		RawURI:       rawURI,

@@ -1,3 +1,18 @@
+# Unreleased
+
+- **Added custom HTTP method and request body support** ([issue #2](https://github.com/slicingmelon/gobypass403/issues/2)) — new `-X/--request` and `--data` flags let you test POST (or any method) requests with a body. All bypass modules now use your method and body as the base request instead of hardcoded GET.
+  - `-X POST` / `-X PUT` / any valid HTTP token; validated against RFC 7230 to block request-line smuggling.
+  - `--data 'raw body'` or `--data @body.json` (body read verbatim from file). No Content-Type is added automatically — pass `-H "Content-Type: ..."` yourself, matching the tool's raw-request philosophy.
+  - `Content-Length` is computed automatically; an explicitly provided `-H Content-Length` takes precedence.
+  - Findings' curl PoC commands now include `-X <method>` (non-GET) and `-d '<body>'` with shell-safe quoting, so successful bypasses are copy-paste reproducible.
+  - Fixed `-r` debug-token resend silently dropping request bodies — resending a POST finding now reproduces the original request byte-exact. The `-r` token info printout also shows the body.
+  - Exceptions: the `http_methods` module keeps rotating methods (that is its purpose), and haproxy's CVE-2021-40346 smuggling job keeps its hardcoded POST and exploit body.
+- **Added full raw request import** (issue #2, phase 2) — new `--request-file` flag scans a captured request straight from a text file (e.g. pasted from Burp, curl -v, mitmproxy).
+  - The file supplies method, request-target, headers and body as the base request for every bypass module; path modules derive variants from the file's path, and the file's `Host` header (when present) wins over the `-u` host.
+  - `-u` remains required and supplies scheme/port; both CRLF and LF line endings are accepted; the body is kept verbatim (no Content-Type added automatically).
+  - Imported headers ride as payload headers, so they survive debug tokens and `-r` resends with full fidelity. `Content-Length` in the file is dropped and recomputed from the body.
+  - `--request-file` cannot be combined with `-X/--request` or `--data` (the file already defines method and body); absolute-form request targets are rejected with a clear error.
+
 # 0.8.8-2
 
 - **Added Debian packaging** — Created standard `debian/` directory (control, copyright, changelog, rules) and a `build-deb` job in the release workflow. On each `v*` tag push, a `.deb` package is now built and attached to the GitHub release.

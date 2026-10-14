@@ -71,7 +71,8 @@ func (pg *PayloadGenerator) GenerateHeadersURLPayloads(targetURL string, bypassM
 	// Base job template
 	baseJob := BypassPayload{
 		OriginalURL:  targetURL,
-		Method:       "GET",
+		Method:       pg.method,
+		Body:         pg.body,
 		Scheme:       parsedURL.Scheme,
 		Host:         parsedURL.Host,
 		BypassModule: bypassModule,

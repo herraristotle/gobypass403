@@ -67,7 +67,8 @@ func (pg *PayloadGenerator) GenerateCharEncodePayloads(targetURL string, bypassM
 	// Base job template
 	baseJob := BypassPayload{
 		OriginalURL: targetURL,
-		Method:      "GET", // Consider making method configurable or based on input
+		Method:      pg.method,
+		Body:        pg.body,
 		Scheme:      parsedURL.Scheme,
 		Host:        parsedURL.Host,
 		// BypassModule field will be set specifically when creating jobs later

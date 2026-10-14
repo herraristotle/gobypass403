@@ -438,7 +438,8 @@ func (pg *PayloadGenerator) generateMidPathsWithCustomPayloads(targetURL string,
 
 		job := BypassPayload{
 			OriginalURL:  targetURL,
-			Method:       "GET",
+			Method:       pg.method,
+			Body:         pg.body,
 			Scheme:       parsedURL.Scheme,
 			Host:         parsedURL.Host,
 			RawURI:       rawURI,

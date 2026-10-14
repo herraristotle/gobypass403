@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
 	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
 )
 
@@ -51,6 +52,17 @@ type CliOptions struct {
 
 	// Custom HTTP Headers
 	CustomHTTPHeaders []string // Stores custom headers in "Name: Value" format
+
+	// Custom request options (issue #2)
+	Method string // -X/--request: HTTP method for base requests (default GET)
+	Data   string // --data: raw request body, or @filepath to read body from a file
+	Body   string // Resolved request body (file contents when Data is @filepath)
+
+	// Full raw request import (issue #2, phase 2)
+	RequestFile   string                 // --request-file: path to a raw HTTP request file
+	ParsedRequest *rawhttp.ParsedRequest // Parsed contents of RequestFile
+	methodSet     bool                   // -X was explicitly provided on the command line
+	dataSet       bool                   // --data was explicitly provided on the command line
 
 	// Output options
 	OutDir        string
@@ -263,6 +275,13 @@ func (o *CliOptions) validate() error {
 		for _, h := range data.Headers {
 			GB403Logger.PrintYellow("  %s: %s\n", h.Header, h.Value)
 		}
+		if data.Body != "" {
+			bodyPreview := data.Body
+			if len(bodyPreview) > 120 {
+				bodyPreview = bodyPreview[:120] + "..."
+			}
+			GB403Logger.PrintYellow("Body: %q\n", bodyPreview)
+		}
 		GB403Logger.PrintYellow("Bypass Module: %s\n\n", data.BypassModule)
 	}
 
@@ -273,6 +292,24 @@ func (o *CliOptions) validate() error {
 
 	// Validate custom HTTP headers
 	if err := o.validateCustomHeaders(); err != nil {
+		return err
+	}
+
+	// Validate custom request options (-X/--request, --data); skip during
+	// resend mode where the debug token carries its own method/body
+	if o.ResendRequest == "" {
+		if err := validateMethod(o.Method); err != nil {
+			return err
+		}
+		body, err := resolveRequestBody(o.Data)
+		if err != nil {
+			return err
+		}
+		o.Body = body
+	}
+
+	// Load and validate a full raw request file (--request-file)
+	if err := o.loadParsedRequest(); err != nil {
 		return err
 	}
 
@@ -559,4 +596,76 @@ func (o *CliOptions) validateCustomHeaders() error {
 	}
 
 	return nil
+}
+
+// loadParsedRequest reads and parses the --request-file input (issue #2,
+// phase 2). The file already carries a method and body, so combining it with
+// -X/--request is a usage error rather than a silent precedence rule.
+func (o *CliOptions) loadParsedRequest() error {
+	if o.RequestFile == "" {
+		return nil
+	}
+	if o.methodSet || o.dataSet {
+		return fmt.Errorf("--request-file cannot be combined with -X/--request or --data: the file already defines the method and body")
+	}
+	content, err := os.ReadFile(o.RequestFile)
+	if err != nil {
+		return fmt.Errorf("failed to read request file %q: %v", o.RequestFile, err)
+	}
+	pr, err := parseRawRequest(string(content))
+	if err != nil {
+		return fmt.Errorf("failed to parse request file %q: %v", o.RequestFile, err)
+	}
+	o.ParsedRequest = pr
+	return nil
+}
+
+// isHTTPTokenChar reports whether c is an RFC 7230 tchar, valid inside a
+// method token. Used to reject methods that could smuggle content into the
+// request line (whitespace, CRLF, separators).
+func isHTTPTokenChar(c byte) bool {
+	switch {
+	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		return true
+	}
+	switch c {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	}
+	return false
+}
+
+// validateMethod validates a user-supplied HTTP method (-X/--request).
+// An empty method is valid and means "not provided" (default GET).
+func validateMethod(method string) error {
+	if method == "" {
+		return nil
+	}
+	for i := 0; i < len(method); i++ {
+		if !isHTTPTokenChar(method[i]) {
+			return fmt.Errorf("invalid HTTP method %q: must be a valid HTTP token (RFC 7230) without whitespace or special characters", method)
+		}
+	}
+	return nil
+}
+
+// resolveRequestBody resolves the --data flag value into the actual request
+// body. A leading '@' means the rest is a file path whose contents are read
+// verbatim; anything else is used verbatim as the body.
+func resolveRequestBody(data string) (string, error) {
+	if data == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(data, "@") {
+		path := data[1:]
+		if path == "" {
+			return "", fmt.Errorf("invalid --data value: empty file path after @")
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to read --data body file %q: %v", path, err)
+		}
+		return string(b), nil
+	}
+	return data, nil
 }
