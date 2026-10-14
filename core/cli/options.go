@@ -52,6 +52,11 @@ type CliOptions struct {
 	// Custom HTTP Headers
 	CustomHTTPHeaders []string // Stores custom headers in "Name: Value" format
 
+	// Custom request options (issue #2)
+	Method string // -X/--request: HTTP method for base requests (default GET)
+	Data   string // --data: raw request body, or @filepath to read body from a file
+	Body   string // Resolved request body (file contents when Data is @filepath)
+
 	// Output options
 	OutDir        string
 	ResultsDBFile string
@@ -274,6 +279,19 @@ func (o *CliOptions) validate() error {
 	// Validate custom HTTP headers
 	if err := o.validateCustomHeaders(); err != nil {
 		return err
+	}
+
+	// Validate custom request options (-X/--request, --data); skip during
+	// resend mode where the debug token carries its own method/body
+	if o.ResendRequest == "" {
+		if err := validateMethod(o.Method); err != nil {
+			return err
+		}
+		body, err := resolveRequestBody(o.Data)
+		if err != nil {
+			return err
+		}
+		o.Body = body
 	}
 
 	// Process and validate status codes
@@ -559,4 +577,54 @@ func (o *CliOptions) validateCustomHeaders() error {
 	}
 
 	return nil
+}
+
+// isHTTPTokenChar reports whether c is an RFC 7230 tchar, valid inside a
+// method token. Used to reject methods that could smuggle content into the
+// request line (whitespace, CRLF, separators).
+func isHTTPTokenChar(c byte) bool {
+	switch {
+	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		return true
+	}
+	switch c {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	}
+	return false
+}
+
+// validateMethod validates a user-supplied HTTP method (-X/--request).
+// An empty method is valid and means "not provided" (default GET).
+func validateMethod(method string) error {
+	if method == "" {
+		return nil
+	}
+	for i := 0; i < len(method); i++ {
+		if !isHTTPTokenChar(method[i]) {
+			return fmt.Errorf("invalid HTTP method %q: must be a valid HTTP token (RFC 7230) without whitespace or special characters", method)
+		}
+	}
+	return nil
+}
+
+// resolveRequestBody resolves the --data flag value into the actual request
+// body. A leading '@' means the rest is a file path whose contents are read
+// verbatim; anything else is used verbatim as the body.
+func resolveRequestBody(data string) (string, error) {
+	if data == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(data, "@") {
+		path := data[1:]
+		if path == "" {
+			return "", fmt.Errorf("invalid --data value: empty file path after @")
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to read --data body file %q: %v", path, err)
+		}
+		return string(b), nil
+	}
+	return data, nil
 }

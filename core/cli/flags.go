@@ -90,6 +90,8 @@ func parseFlags() (*CliOptions, error) {
 		{name: "min-cl,min-content-length", usage: "Filter results by minimum Content-Length (example: -min-cl 100)", value: &opts.MinContentLengthStr},
 		{name: "max-cl,max-content-length", usage: "Filter results by maximum Content-Length (example: -max-cl 5000)", value: &opts.MaxContentLengthStr},
 		{name: "H,header", usage: "Custom HTTP header (example: -H \"X-My-Header: value\"), can be used multiple times", value: &stringSliceFlag{values: &opts.CustomHTTPHeaders}},
+		{name: "X,request", usage: "HTTP method used for base requests, applied by all bypass modules (example: -X POST)", value: &opts.Method, defVal: "GET"},
+		{name: "data", usage: "Request body sent verbatim with base requests; a leading @ reads the body from a file (example: --data 'user=admin', --data @body.json). No Content-Type is added automatically, use -H", value: &opts.Data},
 		{name: "sc,strict-scheme", usage: "Only test URLs with the original scheme from input (prevents auto-expansion to http/https)", value: &opts.StrictScheme, defVal: false},
 		{name: "http2", usage: "Enable HTTP2 client", value: &opts.EnableHTTP2, defVal: false},
 		{name: "x,proxy", usage: "Proxy URL (format: http://proxy:port) (Example: -x http://127.0.0.1:8080)", value: &opts.Proxy},
