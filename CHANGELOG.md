@@ -7,6 +7,11 @@
   - Findings' curl PoC commands now include `-X <method>` (non-GET) and `-d '<body>'` with shell-safe quoting, so successful bypasses are copy-paste reproducible.
   - Fixed `-r` debug-token resend silently dropping request bodies — resending a POST finding now reproduces the original request byte-exact. The `-r` token info printout also shows the body.
   - Exceptions: the `http_methods` module keeps rotating methods (that is its purpose), and haproxy's CVE-2021-40346 smuggling job keeps its hardcoded POST and exploit body.
+- **Added full raw request import** (issue #2, phase 2) — new `--request-file` flag scans a captured request straight from a text file (e.g. pasted from Burp, curl -v, mitmproxy).
+  - The file supplies method, request-target, headers and body as the base request for every bypass module; path modules derive variants from the file's path, and the file's `Host` header (when present) wins over the `-u` host.
+  - `-u` remains required and supplies scheme/port; both CRLF and LF line endings are accepted; the body is kept verbatim (no Content-Type added automatically).
+  - Imported headers ride as payload headers, so they survive debug tokens and `-r` resends with full fidelity. `Content-Length` in the file is dropped and recomputed from the body.
+  - `--request-file` cannot be combined with `-X/--request` or `--data` (the file already defines method and body); absolute-form request targets are rejected with a clear error.
 
 # 0.8.8-2
 
