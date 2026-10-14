@@ -794,6 +794,23 @@ be added with the `-spoof-prefix` flag:
 Values are comma-separated, normalized (leading slash ensured, trailing
 slash stripped) and deduplicated against the built-in wordlist.
 
+## 18. http10
+
+The `http10` module tests HTTP/1.0 protocol downgrade bypasses: it re-sends
+the exact baseline request with an `HTTP/1.0` request line instead of the
+default `HTTP/1.1`. Reverse proxies in a chain sometimes apply their ACL
+only to HTTP/1.1 request parsing, so a 1.0 request reaches the origin
+unfiltered. Two payloads are sent — the plain downgrade (the classic
+`curl --http1.0` probe) and a `Connection: close` companion.
+
+```bash
+./gobypass403 -u http://target.internal:8081/admin -m http10
+```
+
+Findings render with `curl --http1.0` in the PoC column, and the request
+version is preserved in debug tokens, so `-r` resends reproduce the
+downgraded request byte-exact. The module is enabled by default.
+
 # Findings
 
 ## Findings Summary
