@@ -9,7 +9,10 @@ report; no logger, no database, no scan-path coupling.
 */
 package analysis
 
-import "sort"
+import (
+	"encoding/json"
+	"sort"
+)
 
 // Baseline sources reported per target.
 const (
@@ -28,27 +31,47 @@ const (
 	ClassNoise                // empty, non-improving artifact
 )
 
+// String returns the class name used in reports.
+func (c Class) String() string {
+	switch c {
+	case ClassBypass:
+		return "BYPASS"
+	case ClassVariant:
+		return "VARIANT"
+	case ClassDup:
+		return "DUP"
+	case ClassNoise:
+		return "NOISE"
+	}
+	return "UNKNOWN"
+}
+
+// MarshalJSON renders the class as its human-readable name.
+func (c Class) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c.String())
+}
+
 // Cluster is the set of responses sharing one Fingerprint.
 type Cluster struct {
-	Fingerprint    Fingerprint
-	Class          Class
-	Count          int
-	Representative Row
-	Members        []Row
+	Fingerprint    Fingerprint `json:"fingerprint"`
+	Class          Class       `json:"class"`
+	Count          int         `json:"count"`
+	Representative Row         `json:"representative"`
+	Members        []Row       `json:"members"`
 }
 
 // TargetReport is the analysis of one target_url.
 type TargetReport struct {
-	TargetURL      string
-	Rows           int
-	BaselineSource string
-	BaselineStatus int
-	Clusters       []Cluster
+	TargetURL      string    `json:"target_url"`
+	Rows           int       `json:"rows"`
+	BaselineSource string    `json:"baseline_source"`
+	BaselineStatus int       `json:"baseline_status"`
+	Clusters       []Cluster `json:"clusters"`
 }
 
 // Report is the analysis of a whole findings database.
 type Report struct {
-	Targets []TargetReport
+	Targets []TargetReport `json:"targets"`
 }
 
 // ClassifyReport groups rows by target_url and classifies each target,

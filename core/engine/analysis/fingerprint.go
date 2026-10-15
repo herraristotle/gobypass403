@@ -19,23 +19,23 @@ import (
 
 // Row is the subset of a scan_results row the analyzer works with.
 type Row struct {
-	TargetURL           string
-	BypassModule        string
-	StatusCode          int
-	ContentLength       int64
-	ContentType         string
-	ResponseBodyPreview string
-	ResponseBodyBytes   int
-	CurlCMD             string
+	TargetURL           string `json:"target_url"`
+	BypassModule        string `json:"bypass_module"`
+	StatusCode          int    `json:"status_code"`
+	ContentLength       int64  `json:"content_length"`
+	ContentType         string `json:"content_type"`
+	ResponseBodyPreview string `json:"response_body_preview"`
+	ResponseBodyBytes   int    `json:"response_body_bytes"`
+	CurlCMD             string `json:"curl_cmd"`
 }
 
 // Fingerprint identifies a response shape. Responses sharing a Fingerprint
 // are treated as members of the same cluster.
 type Fingerprint struct {
-	Status    int
-	MediaType string
-	Digest    string
-	Length    int64
+	Status    int    `json:"status"`
+	MediaType string `json:"media_type"`
+	Digest    string `json:"digest"`
+	Length    int64  `json:"length"`
 }
 
 // Key returns the exact cluster key for the fingerprint.
