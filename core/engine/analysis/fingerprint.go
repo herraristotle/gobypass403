@@ -46,11 +46,20 @@ func (f Fingerprint) Key() string {
 
 // NewFingerprint derives the fingerprint of a response row.
 func NewFingerprint(r Row) Fingerprint {
+	return FingerprintFrom(r.StatusCode, r.ContentType, []byte(r.ResponseBodyPreview),
+		r.ContentLength, r.ResponseBodyBytes)
+}
+
+// FingerprintFrom derives a fingerprint from live response data. The live
+// scan (Phase B) fingerprints the preview bytes and drops them, so it never
+// retains response bodies; NewFingerprint delegates here so there is exactly
+// one normalisation/hash implementation.
+func FingerprintFrom(status int, contentType string, preview []byte, contentLength int64, bodyBytes int) Fingerprint {
 	return Fingerprint{
-		Status:    r.StatusCode,
-		MediaType: MediaType(r.ContentType),
-		Digest:    digest(Normalize(r.ResponseBodyPreview)),
-		Length:    lengthOf(r),
+		Status:    status,
+		MediaType: MediaType(contentType),
+		Digest:    digest(Normalize(string(preview))),
+		Length:    lengthFrom(contentLength, bodyBytes),
 	}
 }
 
@@ -63,11 +72,11 @@ func MediaType(contentType string) string {
 	return strings.ToLower(strings.TrimSpace(contentType))
 }
 
-func lengthOf(r Row) int64 {
-	if r.ContentLength > 0 {
-		return r.ContentLength
+func lengthFrom(contentLength int64, bodyBytes int) int64 {
+	if contentLength > 0 {
+		return contentLength
 	}
-	return int64(r.ResponseBodyBytes)
+	return int64(bodyBytes)
 }
 
 // Normalize collapses every run of ASCII whitespace bytes to a single space
