@@ -343,6 +343,7 @@ func (c *HTTPClient) handleRetries(req *fasthttp.Request, resp *fasthttp.Respons
 		}
 
 		requestTime := time.Since(start)
+		c.lastResponseTime.Store(requestTime.Milliseconds())
 
 		if err != nil {
 			errCtx := GB403ErrorHandler.ErrorContext{
@@ -406,6 +407,7 @@ func (c *HTTPClient) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, b
 	start := time.Now()
 	err := c.client.Do(req, resp)
 	requestTime := time.Since(start)
+	c.lastResponseTime.Store(requestTime.Milliseconds())
 
 	// Handle initial request result
 	if err != nil {
