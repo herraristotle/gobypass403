@@ -171,6 +171,10 @@ Usage:
         Resend the exact request using the debug token (example: -r xyzdebugtoken)
   -rn, -resend-num
         Number of times to resend the debugged request (Default: 1)
+  -analyze
+        Analyze an existing results database offline (read-only) and print the differential report, then exit (example: -analyze /tmp/scan/results.db)
+  -analyze-json
+        With -analyze: also write the report as JSON to this file (example: -analyze-json /tmp/report.json)
   -profile
         Enable pprof profiler (Default: false)
   -scan-profile
@@ -178,6 +182,44 @@ Usage:
   -update-payloads
         Update payload files to latest version (Default: false)
 ```
+
+## Offline Analysis: what actually bypassed
+
+A scan records *responses*, but not which of them actually differ from the
+target's normal (blocked) response. `-analyze` re-reads a finished
+`results.db` **offline and read-only** — no new requests, no output DB, no
+recon — and classifies every response against that target's baseline:
+
+| Class | Meaning |
+|---|---|
+| `BYPASS` | status improved on the baseline (e.g. baseline `403` → `200`/`3xx`) with a different body — the interesting case |
+| `VARIANT` | same status class, different body (a different block page, a soft-404, …) |
+| `DUP` | exactly the baseline response |
+| `NOISE` | empty, non-improving artifact |
+
+Responses are clustered by exact `(status, media type, sha256(body), length)`,
+so hundreds of near-identical hits collapse into **one** line that states how
+many members were hidden.
+
+```bash
+# Print the differential report for a finished scan (read-only, offline)
+gobypass403 -analyze /tmp/gobypass403_tmp/gobypass403_<id>/results.db
+
+# Same report as JSON for pipelines (stable snake_case field names)
+gobypass403 -analyze /tmp/gobypass403_tmp/gobypass403_<id>/results.db \
+  -analyze-json /tmp/report.json
+```
+
+Baseline: the target's `dumb_check` response when present (the plain request
+with no bypass trick applied); otherwise the target's most common response
+shape — the report says which one was used.
+
+**Honest limits.** Fingerprints are derived from the stored body preview
+(truncated at capture time by `-rbps`), so responses that differ only beyond
+the preview are treated as identical; clustering is exact-digest only (no
+fuzzy matching); and `BYPASS` means "the response changed", not "this is
+exploitable" — every cluster prints its ready-to-run `curl` command so you
+can confirm by hand.
 
 ## Standard WAF 403/401 Bypass
 
