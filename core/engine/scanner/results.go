@@ -188,6 +188,20 @@ func PrintResultsTableFromDB(targetURL, bypassModule string) error {
 	var currentModule, currentStatus string
 	var currentLength int64 = -9999 // Reverted: Identifier for the current sub-group (content/body length)
 	var currentGroup ResultGroup
+	// Rows skipped by the 5-row cap since the current group was opened.
+	// Surfaced in the group separator so truncation is never silent
+	// (bare dots used to hide e.g. 448 of 453 findings on one board).
+	hiddenCount := 0
+
+	noticeMsg := func(n int) string {
+		return "+" + strconv.Itoa(n) + " more in this group (see results.db)"
+	}
+	noticeRow := func(moduleName string, n int) []string {
+		row := make([]string, len(getTableHeader()))
+		row[0] = strings.Repeat(".", max(len(moduleName), 4))
+		row[1] = noticeMsg(n)
+		return row
+	}
 
 	for rows.Next() {
 		var module, curlCmd, contentType, title, serverInfo string
@@ -226,12 +240,18 @@ func PrintResultsTableFromDB(targetURL, bypassModule string) error {
 					if len(tableData) > 0 && len(tableData[0]) > 0 {
 						separator := make([]string, len(tableData[0]))
 						separator[0] = strings.Repeat(".", dotCount)
+						if hiddenCount > 0 {
+							separator[1] = noticeMsg(hiddenCount)
+						}
 						tableData = append(tableData, separator)
 					}
 				}
 			} else if currentGroup.size > 0 { // Else, it's only a sub-group change (same module, same status, different length)
 				// Just flush the previous group's items, no separator
 				tableData = append(tableData, currentGroup.rows...)
+				if hiddenCount > 0 {
+					tableData = append(tableData, noticeRow(currentModule, hiddenCount))
+				}
 			}
 
 			// Start new group
@@ -242,10 +262,12 @@ func PrintResultsTableFromDB(targetURL, bypassModule string) error {
 				rows: make([][]string, 0, 5), // Max 5 items per sub-group
 				size: 0,
 			}
+			hiddenCount = 0
 		}
 
 		// Skip if we already have 5 results for this (module, status, length)
 		if currentGroup.size >= 5 {
+			hiddenCount++
 			continue
 		}
 
@@ -266,6 +288,9 @@ func PrintResultsTableFromDB(targetURL, bypassModule string) error {
 	// Don't forget to add the last group
 	if currentGroup.size > 0 {
 		tableData = append(tableData, currentGroup.rows...)
+	}
+	if hiddenCount > 0 {
+		tableData = append(tableData, noticeRow(currentModule, hiddenCount))
 	}
 
 	if err := rows.Err(); err != nil {

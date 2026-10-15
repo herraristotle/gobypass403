@@ -194,4 +194,4 @@
 
 # 05 November 2024
 
-- First official release
+- First official release- **Fixed silent findings truncation in the results table** — the table renders at most 5 rows per (module, status, length) group, and the group separator used to be bare dots, so target-rich runs looked like they produced only a handful of findings with no hint that more existed (observed on the unKover testbed: 5 of 453 `end_paths` findings shown on the nginx/suffix board; the `-X get` → 200 row was present in every `apache/records` run's results DB yet never rendered). Truncated groups now append `+N more in this group (see results.db)` to their separator row, on both flush paths (mid-table group change and the final flush); groups under the cap render byte-identically to before. Storage and filtering are untouched — the results DB always held every row.
