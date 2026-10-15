@@ -17,41 +17,35 @@ func TestRequestWorkerPoolThrottle(t *testing.T) {
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	requestCount := 0
-	serverDone := make(chan bool)
+	// Canned handler: 429, 429 (with delay), then 200 — emulates the original
+	// stateful fasthttp handler. The guarded counter preserves the original
+	// requestCount++ semantics without the data race.
+	counter := &guardedCounter{}
+	srv := serveRaw(ln, func(*rawRequest) []byte {
+		n := counter.next()
 
-	server := &fasthttp.Server{
-		DisableHeaderNamesNormalizing: true,
-		Handler: func(ctx *fasthttp.RequestCtx) {
-			requestCount++
-			ctx.Response.Header.DisableNormalizing()
-
-			// Add artificial delay to better observe throttling
-			switch requestCount {
-			case 1:
-				t.Logf("Server: Request %d - Returning 429", requestCount)
-				ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
-			case 2:
-				t.Logf("Server: Request %d - Returning 429", requestCount)
-				time.Sleep(100 * time.Millisecond) // Add delay
-				ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
-			default:
-				t.Logf("Server: Request %d - Returning 200", requestCount)
-				ctx.SetStatusCode(fasthttp.StatusOK)
-			}
-		},
-	}
-
-	// Start server with proper shutdown
-	go func() {
-		if err := server.Serve(ln); err != nil {
-			t.Errorf("server error: %v", err)
+		// Add artificial delay to better observe throttling
+		switch n {
+		case 1:
+			t.Logf("Server: Request %d - Returning 429", n)
+			return rawStatus(429)
+		case 2:
+			t.Logf("Server: Request %d - Returning 429", n)
+			time.Sleep(100 * time.Millisecond) // Add delay
+			return rawStatus(429)
+		default:
+			t.Logf("Server: Request %d - Returning 200", n)
+			return rawStatus(200)
 		}
-		serverDone <- true
-	}()
+	})
 
-	// Create client options with custom dialer
+	// Create client options with custom dialer. AutoThrottle must be enabled:
+	// the throttler is nil otherwise, so the third request would race ahead
+	// of the delayed second 429 instead of being throttled behind it, and
+	// this test's completion-order contract ([429, 429, 200]) depends on the
+	// 200ms+ throttle delay landing after the server's 100ms sleep.
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
+	clientOpts.AutoThrottle = true
 	clientOpts.Dialer = func(addr string) (net.Conn, error) {
 		return ln.Dial()
 	}
@@ -65,24 +59,28 @@ func TestRequestWorkerPoolThrottle(t *testing.T) {
 		pool.GetReqWPActiveWorkers(),
 		pool.GetReqWPSubmittedTasks())
 
-	// Create test jobs
+	// Create test jobs (Method is required: BuildRawHTTPRequest round-trips
+	// the raw line through the fork's parser, which rejects an empty method)
 	jobs := []payload.BypassPayload{
 		{
 			Scheme:       "http",
 			Host:         "example.com",
 			RawURI:       "/test1",
+			Method:       "GET",
 			BypassModule: "test-throttle",
 		},
 		{
 			Scheme:       "http",
 			Host:         "example.com",
 			RawURI:       "/test2",
+			Method:       "GET",
 			BypassModule: "test-throttle",
 		},
 		{
 			Scheme:       "http",
 			Host:         "example.com",
 			RawURI:       "/test3",
+			Method:       "GET",
 			BypassModule: "test-throttle",
 		},
 	}
@@ -164,5 +162,5 @@ func TestRequestWorkerPoolThrottle(t *testing.T) {
 
 	// Clean up
 	ln.Close()
-	<-serverDone
+	<-srv.Done
 }

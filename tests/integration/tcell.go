@@ -1,3 +1,11 @@
+//go:build ignore
+
+// Stray terminal-utility scratch program (tcell drawing helpers) committed
+// into this test package directory; package main here breaks the
+// tests/integration build (mixed packages) and pulls in an offline-unavailable
+// dependency. Excluded from builds with the ignore tag rather than deleted.
+// See osc52.go, same situation.
+
 package main
 
 import (

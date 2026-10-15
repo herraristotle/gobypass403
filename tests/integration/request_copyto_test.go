@@ -11,6 +11,11 @@ func TestCustomCopyTo(t *testing.T) {
 	// Create original request with custom settings
 	origReq := &fasthttp.Request{}
 	origReq.SetRequestURI("http://example.com/@rawpath?query=1")
+	// fasthttp only materializes the Host header at write time, so set it
+	// explicitly: this test asserts both full header-string equality and Host
+	// preservation, which are only consistent when the original carries the
+	// Host header itself.
+	origReq.Header.SetHost("example.com")
 	origReq.Header.Set("X-Custom", "value")
 	origReq.Header.DisableNormalizing()          // Disable header normalization
 	origReq.Header.SetNoDefaultContentType(true) // Disable default Content-Type
@@ -36,8 +41,10 @@ func TestCustomCopyTo(t *testing.T) {
 	//assert.True(t, dstReq.Header.DisableNormalizing(), "DisableNormalizing should be true")
 	//assert.True(t, dstReq.Header.NoDefaultContentType(), "NoDefaultContentType should be true")
 
-	// Verify path preservation
-	assert.Equal(t, "/@rawpath?query=1", string(dstReq.URI().Path()), "Path should be preserved exactly")
+	// Verify path preservation. fasthttp's Path() never includes the query
+	// string, so assert path and query separately.
+	assert.Equal(t, "/@rawpath", string(dstReq.URI().Path()), "Path should be preserved exactly")
+	assert.Equal(t, "query=1", string(dstReq.URI().QueryString()), "Query string should be preserved")
 	assert.Equal(t, "http", string(dstReq.URI().Scheme()), "Scheme should be preserved")
 	assert.Equal(t, "example.com", string(dstReq.URI().Host()), "Host should be preserved")
 
@@ -62,8 +69,12 @@ func CustomCopyTo(req *fasthttp.Request, dst *fasthttp.Request) {
 	// Preserve no default content type setting
 	dst.Header.SetNoDefaultContentType(true)
 
-	// Explicitly set the Host header if it was explicitly set in the original request
-	if req.Header.Peek("Host") != nil {
-		dst.Header.SetHostBytes(req.URI().Host())
+	// Explicitly set the Host header from the original request. fasthttp only
+	// populates Header.host at write time, so a URI-derived host must fall
+	// back to the URI object.
+	if h := req.Header.Peek("Host"); len(h) > 0 {
+		dst.Header.SetHostBytes(h)
+	} else if uriHost := req.URI().Host(); len(uriHost) > 0 {
+		dst.Header.SetHostBytes(uriHost)
 	}
 }

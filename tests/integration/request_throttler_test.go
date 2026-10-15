@@ -15,18 +15,13 @@ import (
 
 // TestHTTPClient_Throttler tests the throttler functionality
 func TestHTTPClient_Throttler(t *testing.T) {
-	// Create a test server that returns 429 Too Many Requests
-	server := fasthttp.Server{
-		Handler: func(ctx *fasthttp.RequestCtx) {
-			ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
-		},
-	}
-	defer server.Shutdown()
-
+	// Canned test server that returns 429 Too Many Requests
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	go server.Serve(ln)
+	serveRaw(ln, func(*rawRequest) []byte {
+		return rawStatus(429)
+	})
 
 	opts := rawhttp.DefaultHTTPClientOptions()
 	opts.AutoThrottle = true
@@ -75,20 +70,15 @@ func TestHTTPClient_Throttler2(t *testing.T) {
 	var requestTimes []time.Time
 	var mu sync.Mutex
 
-	server := fasthttp.Server{
-		Handler: func(ctx *fasthttp.RequestCtx) {
-			mu.Lock()
-			requestTimes = append(requestTimes, time.Now())
-			mu.Unlock()
-			ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
-		},
-	}
-	defer server.Shutdown()
-
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	go server.Serve(ln)
+	serveRaw(ln, func(*rawRequest) []byte {
+		mu.Lock()
+		requestTimes = append(requestTimes, time.Now())
+		mu.Unlock()
+		return rawStatus(429)
+	})
 
 	opts := rawhttp.DefaultHTTPClientOptions()
 	opts.AutoThrottle = true
@@ -139,20 +129,15 @@ func TestHTTPClient_ThrottlerMaxDelay(t *testing.T) {
 	var requestTimes []time.Time
 	var mu sync.Mutex
 
-	server := fasthttp.Server{
-		Handler: func(ctx *fasthttp.RequestCtx) {
-			mu.Lock()
-			requestTimes = append(requestTimes, time.Now())
-			mu.Unlock()
-			ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
-		},
-	}
-	defer server.Shutdown()
-
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	go server.Serve(ln)
+	serveRaw(ln, func(*rawRequest) []byte {
+		mu.Lock()
+		requestTimes = append(requestTimes, time.Now())
+		mu.Unlock()
+		return rawStatus(429)
+	})
 
 	opts := rawhttp.DefaultHTTPClientOptions()
 	opts.AutoThrottle = true

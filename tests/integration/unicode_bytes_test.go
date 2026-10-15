@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
@@ -57,35 +58,33 @@ func TestRawHTTPClientBuildAndSendRequest(t *testing.T) {
 	defer ln.Close()
 
 	// Setup server handler
-	serverHandler := func(ctx *fasthttp.RequestCtx) {
+	serverHandler := func(req *rawRequest) []byte {
 		t.Logf("Received request:")
-		t.Logf("Request line: %s %s %s", ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
-		t.Logf("Host header: %s", string(ctx.Request.Header.Peek("Host")))
-		t.Logf("X-Test-Header: %s", string(ctx.Request.Header.Peek("X-Test-Header")))
-		t.Logf("Full Headers:\n%s", ctx.Request.Header.String())
+		t.Logf("Request line: %s %s %s", req.Method, req.Target, req.Proto)
+		t.Logf("Host header: %s", req.Header("Host"))
+		t.Logf("X-Test-Header: %s", req.Header("X-Test-Header"))
+		t.Logf("Full request:\n%s", req.Raw)
 
 		// Verify the request line
-		if string(ctx.RequestURI()) != "/path/こんにちは" {
+		if req.Target != "/path/こんにちは" {
 			t.Errorf("Expected request line to be 'GET /path/こんにちは HTTP/1.1', but got '%s %s %s'",
-				ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
+				req.Method, req.Target, req.Proto)
 		}
 
 		// Simulate response
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBodyString("Request received")
+		return rawResp(200, nil, "Request received")
 	}
 
-	// Start server
-	serverCh := make(chan struct{})
-	go func() {
-		if err := fasthttp.Serve(ln, serverHandler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-		close(serverCh)
-	}()
+	// Start raw in-memory server
+	serveRaw(ln, serverHandler)
 
-	// Create rawhttp.HTTPClient with default options
-	client := rawhttp.NewHTTPClient(rawhttp.DefaultHTTPClientOptions())
+	// Create rawhttp.HTTPClient. The dialer must route to the in-memory
+	// listener; historically it was missing and the test dialed real :80.
+	opts := rawhttp.DefaultHTTPClientOptions()
+	opts.Dialer = func(addr string) (net.Conn, error) {
+		return ln.Dial()
+	}
+	client := rawhttp.NewHTTPClient(opts)
 
 	// Create a PayloadJob with Unicode in the path and headers
 	job := payload.BypassPayload{
@@ -130,6 +129,22 @@ func TestRawHTTPClientBuildAndSendRequest(t *testing.T) {
 }
 
 func TestRawHTTPClientBuildAndSendRequestDirectLocalhost(t *testing.T) {
+	// Hermetic replacement for the historical assumption of a server already
+	// running on localhost:80: a real TCP listener on an ephemeral port.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	serveRaw(ln, func(req *rawRequest) []byte {
+		if req.Target != "/path/こんにちは" {
+			t.Errorf("Expected request line to be 'GET /path/こんにちは HTTP/1.1', but got '%s %s %s'",
+				req.Method, req.Target, req.Proto)
+		}
+		return rawResp(200, nil, "Request received")
+	})
+
 	opts := rawhttp.DefaultHTTPClientOptions()
 	opts.Dialer = rawhttp.CreateHTTPClientDialer(opts.DialTimeout, opts.ProxyURL)
 
@@ -138,12 +153,12 @@ func TestRawHTTPClientBuildAndSendRequestDirectLocalhost(t *testing.T) {
 
 	// Create a PayloadJob with Unicode in the path and headers
 	job := payload.BypassPayload{
-		Method: "GET",
-		Scheme: "http",
-		Host:   "127.0.0.1",   // Target your test server here
-		RawURI: "/path/こんにちは", // Unicode path
+		Method:  "GET",
+		Scheme:  "http",
+		Host:    ln.Addr().String(), // Target the hermetic test server
+		RawURI:  "/path/こんにちは",    // Unicode path
 		Headers: []payload.Headers{
-			{Header: "Host", Value: "evil.com"},       // Spoofed Host header
+			{Header: "Host", Value: "evil.com"},        // Spoofed Host header
 			{Header: "X-Test-Header", Value: "こんにちは"}, // Unicode header
 		},
 		PayloadToken: "debug-token-123",
@@ -156,7 +171,7 @@ func TestRawHTTPClientBuildAndSendRequestDirectLocalhost(t *testing.T) {
 	defer fasthttp.ReleaseResponse(resp)
 
 	// Build the raw HTTP request
-	err := rawhttp.BuildRawHTTPRequest(client, req, job)
+	err = rawhttp.BuildRawHTTPRequest(client, req, job)
 	assert.NoError(t, err, "Failed to build raw HTTP request")
 
 	// Log the request details

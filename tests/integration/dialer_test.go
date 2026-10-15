@@ -21,20 +21,13 @@ func TestDialerInMemory(t *testing.T) {
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	// Setup test handler
-	testHandler := func(ctx *fasthttp.RequestCtx) {
-		ctx.Response.Header.Set("X-Test", "inmemory-dialer-test")
-		ctx.SetStatusCode(fasthttp.StatusOK)
+	// Setup test handler: 200 with a marker header (raw response).
+	testHandler := func(*rawRequest) []byte {
+		return rawResp(200, [][2]string{{"X-Test", "inmemory-dialer-test"}}, "")
 	}
 
-	// Start server
-	serverCh := make(chan struct{})
-	go func() {
-		if err := fasthttp.Serve(ln, testHandler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-		close(serverCh)
-	}()
+	// Start raw in-memory server
+	serveRaw(ln, testHandler)
 
 	// Create client options with custom dialer
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
@@ -78,9 +71,6 @@ func TestDialerInMemory(t *testing.T) {
 		t.Errorf("unexpected status code: got %d, want %d",
 			result.StatusCode, fasthttp.StatusOK)
 	}
-
-	// Cleanup
-	ln.Close()
 }
 
 func TestDialerWithProxy(t *testing.T) {
@@ -91,18 +81,13 @@ func TestDialerWithProxy(t *testing.T) {
 	proxyRequestCount := &atomic.Int64{}
 
 	// Simple handler that just counts requests and returns 200
-	handler := func(ctx *fasthttp.RequestCtx) {
+	handler := func(*rawRequest) []byte {
 		proxyRequestCount.Add(1)
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBodyString("Proxied response")
+		return rawResp(200, nil, "Proxied response")
 	}
 
-	// Start server
-	go func() {
-		if err := fasthttp.Serve(ln, handler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-	}()
+	// Start raw in-memory server
+	serveRaw(ln, handler)
 
 	// Create client options with proxy
 	clientOpts := rawhttp.DefaultHTTPClientOptions()

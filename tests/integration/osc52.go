@@ -1,3 +1,10 @@
+//go:build ignore
+
+// Stray terminal-utility scratch program (OSC52 clipboard/hyperlinks) that was
+// committed into this test package directory; package main here breaks the
+// tests/integration build (mixed packages). Excluded from builds with the
+// ignore tag rather than deleted. See tcell.go, same situation.
+
 package main
 
 import (

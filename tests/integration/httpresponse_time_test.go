@@ -12,11 +12,12 @@ import (
 	"github.com/valyala/fasthttp/fasthttputil"
 )
 
-func simpleHandler(ctx *fasthttp.RequestCtx) {
+// simpleDelayedResp emulates the original fasthttp handler: 200 with body
+// and a 50 ms processing delay.
+func simpleDelayedResp(*rawRequest) []byte {
 	// Simulate some processing delay.
 	time.Sleep(50 * time.Millisecond)
-	ctx.SetStatusCode(fasthttp.StatusOK)
-	ctx.SetBody([]byte("Hello, world!"))
+	return rawResp(200, nil, "Hello, world!")
 }
 
 func TestClientResponseTimeSequential(t *testing.T) {
@@ -24,13 +25,8 @@ func TestClientResponseTimeSequential(t *testing.T) {
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	// Start fasthttp server in a goroutine,
-	// using our simpleHandler.
-	go func() {
-		if err := fasthttp.Serve(ln, simpleHandler); err != nil {
-			t.Logf("Server error: %v", err)
-		}
-	}()
+	// Start the raw in-memory server with our canned handler.
+	serveRaw(ln, simpleDelayedResp)
 
 	// Create custom dialer that uses the in-memory listener.
 	dialer := func(addr string) (net.Conn, error) {
@@ -91,12 +87,8 @@ func TestClientResponseTimeConcurrent(t *testing.T) {
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	// Start fasthttp server in a goroutine.
-	go func() {
-		if err := fasthttp.Serve(ln, simpleHandler); err != nil {
-			t.Logf("Server error: %v", err)
-		}
-	}()
+	// Start the raw in-memory server with our canned handler.
+	serveRaw(ln, simpleDelayedResp)
 
 	dialer := func(addr string) (net.Conn, error) {
 		return ln.Dial()

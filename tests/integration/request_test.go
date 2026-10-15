@@ -19,19 +19,12 @@ func TestClient301RedirectInmemory(t *testing.T) {
 	defer ln.Close()
 
 	// Setup redirect handler
-	redirectHandler := func(ctx *fasthttp.RequestCtx) {
-		ctx.Response.Header.Set("Location", "https://redirected.com/newpath")
-		ctx.SetStatusCode(fasthttp.StatusMovedPermanently) // 301
+	redirectHandler := func(*rawRequest) []byte {
+		return rawResp(301, [][2]string{{"Location", "https://redirected.com/newpath"}}, "")
 	}
 
-	// Start server
-	serverCh := make(chan struct{})
-	go func() {
-		if err := fasthttp.Serve(ln, redirectHandler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-		close(serverCh)
-	}()
+	// Start raw in-memory server
+	srv := serveRaw(ln, redirectHandler)
 
 	// Create client options with custom dialer
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
@@ -95,7 +88,7 @@ func TestClient301RedirectInmemory(t *testing.T) {
 
 	// Wait for server shutdown
 	select {
-	case <-serverCh:
+	case <-srv.Done:
 	case <-time.After(time.Second):
 		t.Fatal("server shutdown timeout")
 	}
@@ -106,22 +99,10 @@ func TestClient302RedirectCaseInsensitive(t *testing.T) {
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	server := &fasthttp.Server{
-		DisableHeaderNamesNormalizing: true,
-		Handler: func(ctx *fasthttp.RequestCtx) {
-			// Use lowercase 'location' header
-			ctx.Response.Header.DisableNormalizing()
-			ctx.Response.Header.Set("location", "https://redirected.com/newpath")
-			ctx.SetStatusCode(fasthttp.StatusFound) // 302
-		},
-	}
-
-	// Start server
-	go func() {
-		if err := server.Serve(ln); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-	}()
+	// Raw server: lowercase 'location' header preserved byte-for-byte.
+	serveRaw(ln, func(*rawRequest) []byte {
+		return rawResp(302, [][2]string{{"location", "https://redirected.com/newpath"}}, "")
+	})
 
 	// Create client options with custom dialer
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
@@ -182,21 +163,15 @@ func TestRequestDelay(t *testing.T) {
 	var mu sync.Mutex
 
 	// Setup handler that records request times
-	handler := func(ctx *fasthttp.RequestCtx) {
+	handler := func(*rawRequest) []byte {
 		mu.Lock()
 		requestTimes = append(requestTimes, time.Now())
 		mu.Unlock()
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		return rawStatus(200)
 	}
 
-	// Start server
-	serverCh := make(chan struct{})
-	go func() {
-		if err := fasthttp.Serve(ln, handler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-		close(serverCh)
-	}()
+	// Start raw in-memory server
+	srv := serveRaw(ln, handler)
 
 	// Create client options with delay
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
@@ -205,8 +180,10 @@ func TestRequestDelay(t *testing.T) {
 		return ln.Dial()
 	}
 
-	// Create request pool
-	pool := rawhttp.NewRequestWorkerPool(clientOpts, 10)
+	// Create request pool with a single worker: the3s RequestDelay is applied
+	// per request inside DoRequest, so only serial execution produces the
+	// ~3s intervals this test asserts (10 workers would sleep in parallel).
+	pool := rawhttp.NewRequestWorkerPool(clientOpts, 1)
 
 	// Create test payloads
 	jobs := []payload.BypassPayload{
@@ -272,7 +249,7 @@ func TestRequestDelay(t *testing.T) {
 
 	// Cleanup
 	ln.Close()
-	<-serverCh
+	<-srv.Done
 }
 
 // go.exe test -timeout 30s -run ^TestRequestDelayWithMultipleWorkers$ github.com/slicingmelon/gobypass403/tests/integration -v
@@ -290,21 +267,15 @@ func TestRequestDelayWithMultipleWorkers(t *testing.T) {
 	var mu sync.Mutex
 
 	// Simple handler that just records timestamps
-	handler := func(ctx *fasthttp.RequestCtx) {
+	handler := func(*rawRequest) []byte {
 		mu.Lock()
 		timestamps = append(timestamps, time.Now())
 		mu.Unlock()
-		ctx.SetStatusCode(fasthttp.StatusOK)
+		return rawStatus(200)
 	}
 
-	// Start server
-	serverCh := make(chan struct{})
-	go func() {
-		if err := fasthttp.Serve(ln, handler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-		close(serverCh)
-	}()
+	// Start raw in-memory server
+	srv := serveRaw(ln, handler)
 
 	// Create client with 3s delay
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
@@ -350,5 +321,5 @@ func TestRequestDelayWithMultipleWorkers(t *testing.T) {
 
 	// Cleanup
 	ln.Close()
-	<-serverCh
+	<-srv.Done
 }

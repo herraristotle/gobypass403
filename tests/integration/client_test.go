@@ -1,21 +1,36 @@
 package tests
 
 import (
+	"errors"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
 	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
 	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
 )
 
 func TestConsecutiveFailures(t *testing.T) {
+	// Hermetic failure source: accept and close without responding, so every
+	// request fails with a retryable connection error. The historical target
+	// (whatever listens on localhost:80) made this test environment-dependent.
+	ln := fasthttputil.NewInmemoryListener()
+	defer ln.Close()
+	serveRawResult(ln, func(*rawRequest) rawResult {
+		return rawResult{} // no response bytes, connection closed
+	})
+
 	opts := rawhttp.DefaultHTTPClientOptions()
 	opts.Timeout = 1000 * time.Millisecond
 	opts.MaxRetries = 3
 	opts.RetryDelay = 200 * time.Millisecond
 	opts.MaxConsecutiveFailedReqs = 5
 	opts.BypassModule = "test-mode"
+	opts.Dialer = func(addr string) (net.Conn, error) {
+		return ln.Dial()
+	}
 
 	client := rawhttp.NewHTTPClient(opts)
 
@@ -48,7 +63,8 @@ func TestConsecutiveFailures(t *testing.T) {
 				return // Test succeeded as expected
 			}
 
-			if err == rawhttp.ErrReqFailedMaxRetries {
+			// ErrReqFailedMaxRetries is wrapped by DoRequest's error message
+			if errors.Is(err, rawhttp.ErrReqFailedMaxRetries) {
 				totalRetries += int(client.GetPerReqRetryAttempts())
 				t.Logf("Request %d failed after retries. Consecutive failures: %d, Total retries: %d, Time: %v",
 					totalRequests,

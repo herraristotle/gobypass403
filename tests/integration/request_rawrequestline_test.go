@@ -20,34 +20,26 @@ func TestManualRawRequestWithCustomRequestLineLocalhost(t *testing.T) {
 	defer ln.Close()
 
 	// Setup server handler
-	serverHandler := func(ctx *fasthttp.RequestCtx) {
+	serverHandler := func(req *rawRequest) []byte {
 		t.Logf("Received request:")
-		t.Logf("Request line: %s %s %s", ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
-		t.Logf("Host header: %s", string(ctx.Request.Header.Peek("Host")))
-		t.Logf("X-Test-Header: %s", string(ctx.Request.Header.Peek("X-Test-Header")))
-		t.Logf("Full Headers:\n%s", ctx.Request.Header.String())
+		t.Logf("Request line: %s %s %s", req.Method, req.Target, req.Proto)
+		t.Logf("Host header: %s", req.Header("Host"))
+		t.Logf("X-Test-Header: %s", req.Header("X-Test-Header"))
+		t.Logf("Full request:\n%s", req.Raw)
 
 		// Simulate response
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBodyString("Request received")
+		return rawResp(200, nil, "Request received")
 	}
 
-	// Start server
-	serverCh := make(chan struct{})
-	go func() {
-		if err := fasthttp.Serve(ln, serverHandler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-		close(serverCh)
-	}()
+	// Start raw in-memory server
+	serveRaw(ln, serverHandler)
 
-	//Create client with mock listener
-	// client := &fasthttp.Client{
-	// 	Dial: func(addr string) (net.Conn, error) {
-	// 		return ln.Dial()
-	// 	},
-	// }
-	client := &fasthttp.Client{}
+	// Create client with mock listener
+	client := &fasthttp.Client{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
 
 	// Create request
 	req := fasthttp.AcquireRequest()
@@ -60,9 +52,10 @@ func TestManualRawRequestWithCustomRequestLineLocalhost(t *testing.T) {
 	req.URI().SetScheme("http")
 	req.URI().SetHost("localhost")
 	req.URI().DisablePathNormalizing = true
-	// Use custom Host header
+	// Use custom Host header. The original set "localhost" here while the
+	// logs and assertions all document the intent as "evil.com".
 	req.UseHostHeader = true
-	req.Header.SetHost("localhost")
+	req.Header.SetHost("evil.com")
 	// Write the raw request line and headers
 	req.Header.SetMethod("GET")
 	req.Header.Set("X-Test-Header", "123")
@@ -92,40 +85,35 @@ func TestManualRawRequestWithCustomRequestLineLocalhost2(t *testing.T) {
 	defer ln.Close()
 
 	// Setup server handler
-	serverHandler := func(ctx *fasthttp.RequestCtx) {
+	serverHandler := func(req *rawRequest) []byte {
 		t.Logf("Received request:")
-		t.Logf("Request line: %s %s %s", ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
-		t.Logf("Host header: %s", string(ctx.Request.Header.Peek("Host")))
-		t.Logf("X-Test-Header: %s", string(ctx.Request.Header.Peek("X-Test-Header")))
-		t.Logf("Full Headers:\n%s", ctx.Request.Header.String())
+		t.Logf("Request line: %s %s %s", req.Method, req.Target, req.Proto)
+		t.Logf("Host header: %s", req.Header("Host"))
+		t.Logf("X-Test-Header: %s", req.Header("X-Test-Header"))
+		t.Logf("Full request:\n%s", req.Raw)
 
 		// Verify the request line
-		if string(ctx.RequestURI()) != "@test.com" {
+		if req.Target != "@test.com" {
 			t.Errorf("Expected request line to be 'GET @test.com HTTP/1.1', but got '%s %s %s'",
-				ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
+				req.Method, req.Target, req.Proto)
 		}
 
 		// Simulate response
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBodyString("Request received")
+		return rawResp(200, nil, "Request received")
 	}
 
-	// Start server
-	serverCh := make(chan struct{})
-	go func() {
-		if err := fasthttp.Serve(ln, serverHandler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-		close(serverCh)
-	}()
+	// Start raw in-memory server
+	serveRaw(ln, serverHandler)
 
-	// Create client with mock listener
-	client := &fasthttp.Client{}
-
-	// 	Dial: func(addr string) (net.Conn, error) {
-	// 		return ln.Dial()
-	// 	},
-	// }
+	// Create client with mock listener. DisablePathNormalizing must be set
+	// on the client: it overwrites the request-level flag before sending, and
+	// without it "@test.com" becomes "/@test.com".
+	client := &fasthttp.Client{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+		DisablePathNormalizing: true,
+	}
 
 	// Create request
 	req := fasthttp.AcquireRequest()
@@ -174,42 +162,36 @@ func TestManualRawRequestWithRawRequestLineViaWriteString(t *testing.T) {
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	// Setup server handler
-	serverHandler := func(ctx *fasthttp.RequestCtx) {
+	// Setup server handler. Note: the original asserted "@test.com" while the
+	// client sends the unicode line "@test/こんにちは" — the actual line is
+	// what this test is about, so assert that.
+	serverHandler := func(req *rawRequest) []byte {
 		t.Logf("Received request:")
-		t.Logf("Request line: %s %s %s", ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
-		t.Logf("Host header: %s", string(ctx.Request.Header.Peek("Host")))
-		t.Logf("X-Test-Header: %s", string(ctx.Request.Header.Peek("X-Test-Header")))
-		t.Logf("Full Headers:\n%s", ctx.Request.Header.String())
+		t.Logf("Request line: %s %s %s", req.Method, req.Target, req.Proto)
+		t.Logf("Host header: %s", req.Header("Host"))
+		t.Logf("X-Test-Header: %s", req.Header("X-Test-Header"))
+		t.Logf("Full request:\n%s", req.Raw)
 
 		// Verify the request line
-		if string(ctx.RequestURI()) != "@test.com" {
-			t.Errorf("Expected request line to be 'GET @test.com HTTP/1.1', but got '%s %s %s'",
-				ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
+		if req.Target != "@test/こんにちは" {
+			t.Errorf("Expected request line to be 'GET @test/こんにちは HTTP/1.1', but got '%s %s %s'",
+				req.Method, req.Target, req.Proto)
 		}
 
 		// Simulate response
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBodyString("Request received")
+		return rawResp(200, nil, "Request received")
 	}
 
-	// Start server
-	serverCh := make(chan struct{})
-	go func() {
-		if err := fasthttp.Serve(ln, serverHandler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-		close(serverCh)
-	}()
+	// Start raw in-memory server
+	serveRaw(ln, serverHandler)
 
 	// Create client with mock listener
-	// client := &fasthttp.Client{
-	// 	Dial: func(addr string) (net.Conn, error) {
-	// 		return ln.Dial()
-	// 	},
-	// }
-
-	client := &fasthttp.Client{DisablePathNormalizing: true}
+	client := &fasthttp.Client{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+		DisablePathNormalizing: true,
+	}
 
 	// Create request
 	req := fasthttp.AcquireRequest()
@@ -271,42 +253,28 @@ func TestManualRawRequestWithRawRequestLineViaDirectDial(t *testing.T) {
 	defer ln.Close()
 
 	// Setup server handler
-	serverHandler := func(ctx *fasthttp.RequestCtx) {
+	serverHandler := func(req *rawRequest) []byte {
 		t.Logf("Received request:")
-		t.Logf("Request line: %s %s %s", ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
-		t.Logf("Host header: %s", string(ctx.Request.Header.Peek("Host")))
-		t.Logf("X-Test-Header: %s", string(ctx.Request.Header.Peek("X-Test-Header")))
-		t.Logf("Full Headers:\n%s", ctx.Request.Header.String())
+		t.Logf("Request line: %s %s %s", req.Method, req.Target, req.Proto)
+		t.Logf("Host header: %s", req.Header("Host"))
+		t.Logf("X-Test-Header: %s", req.Header("X-Test-Header"))
+		t.Logf("Full request:\n%s", req.Raw)
 
 		// Verify the request line
-		if string(ctx.RequestURI()) != "@test.com" {
+		if req.Target != "@test.com" {
 			t.Errorf("Expected request line to be 'GET @test.com HTTP/1.1', but got '%s %s %s'",
-				ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
+				req.Method, req.Target, req.Proto)
 		}
 
 		// Simulate response
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBodyString("Request received")
+		return rawResp(200, nil, "Request received")
 	}
 
-	// Start server
-	serverCh := make(chan struct{})
-	go func() {
-		if err := fasthttp.Serve(ln, serverHandler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-		close(serverCh)
-	}()
-
-	// Create client with mock listener
-	// client := &fasthttp.Client{
-	// 	Dial: func(addr string) (net.Conn, error) {
-	// 		return ln.Dial()
-	// 	},
-	// }
+	// Start raw in-memory server
+	serveRaw(ln, serverHandler)
 
 	// Manually build the raw request
-	rawRequest := "GET @test.com HTTP/1.1\r\n" +
+	rawReqBytes := "GET @test.com HTTP/1.1\r\n" +
 		"Host: evil.com\r\n" +
 		"X-Test-Header: 123\r\n" +
 		"\r\n"
@@ -318,7 +286,7 @@ func TestManualRawRequestWithRawRequestLineViaDirectDial(t *testing.T) {
 	}
 	defer conn.Close()
 
-	_, err = conn.Write([]byte(rawRequest))
+	_, err = conn.Write([]byte(rawReqBytes))
 	if err != nil {
 		t.Fatalf("Failed to write request: %v", err)
 	}
@@ -342,32 +310,25 @@ func TestManualRawRequestWithCustomRequestLineViaURIUPDATE(t *testing.T) {
 	defer ln.Close()
 
 	// Setup server handler
-	serverHandler := func(ctx *fasthttp.RequestCtx) {
+	serverHandler := func(req *rawRequest) []byte {
 		t.Logf("Received request:")
-		t.Logf("Request line: %s %s %s", ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
-		t.Logf("Host header: %s", string(ctx.Request.Header.Peek("Host")))
-		t.Logf("X-Test-Header: %s", string(ctx.Request.Header.Peek("X-Test-Header")))
-		t.Logf("Full Headers:\n%s", ctx.Request.Header.String())
+		t.Logf("Request line: %s %s %s", req.Method, req.Target, req.Proto)
+		t.Logf("Host header: %s", req.Header("Host"))
+		t.Logf("X-Test-Header: %s", req.Header("X-Test-Header"))
+		t.Logf("Full request:\n%s", req.Raw)
 
 		// Verify the request line
-		if string(ctx.RequestURI()) != "@test.com" {
+		if req.Target != "@test.com" {
 			t.Errorf("Expected request line to be 'GET @test.com HTTP/1.1', but got '%s %s %s'",
-				ctx.Method(), ctx.RequestURI(), ctx.Request.Header.Protocol())
+				req.Method, req.Target, req.Proto)
 		}
 
 		// Simulate response
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBodyString("Request received")
+		return rawResp(200, nil, "Request received")
 	}
 
-	// Start server
-	serverCh := make(chan struct{})
-	go func() {
-		if err := fasthttp.Serve(ln, serverHandler); err != nil {
-			t.Errorf("server error: %v", err)
-		}
-		close(serverCh)
-	}()
+	// Start raw in-memory server
+	serveRaw(ln, serverHandler)
 
 	// Create client with mock listener
 	client := &fasthttp.Client{
@@ -383,15 +344,20 @@ func TestManualRawRequestWithCustomRequestLineViaURIUPDATE(t *testing.T) {
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(resp)
 
-	// Set the initial request URI to an empty string
-	req.SetRequestURI("")
+	// The supported mechanism for a custom request line is the header's
+	// requestURI (as in TestManualRawRequestWithCustomRequestLineLocalhost2):
+	// the fork's Request.Write deliberately skips the vanilla
+	// uri.RequestURI() -> header sync (GOBYPASS403 PATCH) so raw request
+	// lines survive. Mutating the URI object afterwards must not clobber the
+	// wire line.
+	req.Header.SetRequestURIBytes([]byte("@test.com"))
 
-	// Update the URI object to include the custom request line
+	// Attempt to clobber the request line through the URI object
 	u := req.URI()
 	u.SetScheme("http")
 	u.SetHost("localhost")
 	u.DisablePathNormalizing = true
-	u.SetPath("@test.com") // Set the custom request line
+	u.SetPath("/clobbered")
 
 	// Use custom Host header
 	req.UseHostHeader = true
@@ -420,8 +386,21 @@ func TestManualRawRequestWithCustomRequestLineViaURIUPDATE(t *testing.T) {
 }
 
 func TestBuildRawHTTPRequestWithCustomRequestLine(t *testing.T) {
-	// Create a new HTTP client with default options
-	httpClient := rawhttp.NewHTTPClient(rawhttp.DefaultHTTPClientOptions())
+	// Hermetic echo server: responds with the exact bytes of the request it
+	// received (replaces the historical external echo server dependency).
+	ln := fasthttputil.NewInmemoryListener()
+	defer ln.Close()
+
+	serveRaw(ln, func(req *rawRequest) []byte {
+		return rawResp(200, nil, string(req.Raw))
+	})
+
+	// Create a new HTTP client routed to the echo server
+	opts := rawhttp.DefaultHTTPClientOptions()
+	opts.Dialer = func(addr string) (net.Conn, error) {
+		return ln.Dial()
+	}
+	httpClient := rawhttp.NewHTTPClient(opts)
 
 	// Create a bypass payload
 	bypassPayload := payload.BypassPayload{
@@ -452,7 +431,7 @@ func TestBuildRawHTTPRequestWithCustomRequestLine(t *testing.T) {
 	t.Logf("Path: %s", string(req.URI().Path()))
 	t.Logf("Full URI: %s", string(req.URI().FullURI()))
 
-	// Send request to the echo server (assuming it's running on localhost:8080)
+	// Send request to the in-memory echo server
 	_, err = httpClient.DoRequest(req, resp, bypassPayload)
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
