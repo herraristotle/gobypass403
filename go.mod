@@ -16,12 +16,12 @@ require (
 	github.com/likexian/doh v0.7.1
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/phuslu/fastdns v0.15.2
-	github.com/pierrec/lz4/v4 v4.1.22
+	github.com/pierrec/lz4/v4 v4.1.21
 	github.com/pterm/pterm v0.12.81
 	github.com/refraction-networking/utls v1.8.0
 	github.com/slicingmelon/go-bytesutil v0.0.2
 	github.com/slicingmelon/go-rawurlparser v0.3.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/valyala/fasthttp v1.64.0
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	golang.design/x/clipboard v0.7.1
