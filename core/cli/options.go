@@ -32,6 +32,7 @@ type CliOptions struct {
 	// Scan configuration
 	Module                   string
 	ExcludeModule            string
+	ScanProfile              string   // -scan-profile preset: full (default) | triage (Addendum 4)
 	MatchStatusCodesStr      string
 	MatchStatusCodes         []int
 	MatchContentType         string   // New field for multiple types
@@ -63,6 +64,7 @@ type CliOptions struct {
 	ParsedRequest *rawhttp.ParsedRequest // Parsed contents of RequestFile
 	methodSet     bool                   // -X was explicitly provided on the command line
 	dataSet       bool                   // --data was explicitly provided on the command line
+	moduleSet     bool                   // -m was explicitly provided on the command line
 
 	// Output options
 	OutDir        string
@@ -124,6 +126,35 @@ var AvailableModules = map[string]bool{
 	"unicode_path_normalization": true,
 	"unicode_path_truncation":    true,
 	"unicode_path_experimental":  true,
+}
+
+// profileTriageModules is the -scan-profile triage preset
+// (SPEC-unkover-gaps.md Addendum 4): every BypassModulesRegistry module
+// except the deep families (path_prefix, unicode_path_*, param_manipulation),
+// listed in registry order. Triage covers every technique the unKover
+// testbed exercises (headers_ip, end_paths suffix, http_methods case,
+// char_encode url-encoding, http10, api_versions, hop-by-hop) plus the
+// full header-matrix depth — minutes per target instead of a full -m all
+// enumeration (68,819 payloads with scheme expansion).
+var profileTriageModules = []string{
+	"dumb_check",
+	"mid_paths",
+	"end_paths",
+	"http_methods",
+	"case_substitution",
+	"char_encode",
+	"nginx_bypasses",
+	"haproxy_bypasses",
+	"headers_scheme",
+	"headers_ip",
+	"headers_port",
+	"headers_url",
+	"headers_host",
+	"headers_hop_by_hop",
+	"api_versions",
+	"http10",
+	"headers_method",
+	"user_agent",
 }
 
 // matchGlob performs simple glob pattern matching
@@ -214,6 +245,18 @@ func (o *CliOptions) setDefaults() {
 	if o.Module == "" {
 		o.Module = "all"
 	}
+
+	// -scan-profile (Addendum 4): normalize and apply the triage base.
+	// The profile supplies the -m base ONLY when -m was not explicitly
+	// set (flag.Visit records moduleSet); -em still subtracts from
+	// whatever base validateModule resolves.
+	o.ScanProfile = strings.ToLower(strings.TrimSpace(o.ScanProfile))
+	if o.ScanProfile == "" {
+		o.ScanProfile = "full"
+	}
+	if o.ScanProfile == "triage" && !o.moduleSet {
+		o.Module = strings.Join(profileTriageModules, ",")
+	}
 	if o.ConcurrentRequests == 0 {
 		o.ConcurrentRequests = 15
 	}
@@ -255,6 +298,12 @@ func (o *CliOptions) setDefaults() {
 
 // validate performs all validation checks
 func (o *CliOptions) validate() error {
+	// Validate -scan-profile value first (pure flag syntax; full | triage;
+	// empty normalized by setDefaults)
+	if o.ScanProfile != "full" && o.ScanProfile != "triage" {
+		return fmt.Errorf("invalid -scan-profile value %q: must be \"full\" or \"triage\"", o.ScanProfile)
+	}
+
 	// Check for update payloads first
 	if o.UpdatePayloads {
 		if err := payload.UpdatePayloads(); err != nil {

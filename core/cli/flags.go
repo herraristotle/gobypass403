@@ -106,6 +106,7 @@ func parseFlags() (*CliOptions, error) {
 		{name: "r,resend,resend-request", usage: "Resend the exact request using the debug token (example: -r xyzdebugtoken)", value: &opts.ResendRequest},
 		{name: "rn,resend-num,resend-request-num", usage: "Number of times to resend the debugged request", value: &opts.ResendNum, defVal: 1},
 		{name: "profile", usage: "Enable pprof profiler", value: &opts.Profile, defVal: false},
+		{name: "scan-profile", usage: "Scan scope preset: full (all bypass modules) or triage (high-signal subset for first-pass triage; explicit -m wins, -em subtracts)", value: &opts.ScanProfile, defVal: "full"},
 		{name: "update-payloads", usage: "Update payload files to latest version", value: &opts.UpdatePayloads, defVal: false},
 	}
 
@@ -171,6 +172,8 @@ func parseFlags() (*CliOptions, error) {
 			opts.methodSet = true
 		case "data":
 			opts.dataSet = true
+		case "m", "module":
+			opts.moduleSet = true
 		}
 	})
 

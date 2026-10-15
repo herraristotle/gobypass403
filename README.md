@@ -173,6 +173,8 @@ Usage:
         Number of times to resend the debugged request (Default: 1)
   -profile
         Enable pprof profiler (Default: false)
+  -scan-profile
+        Scan scope preset: full (all bypass modules) or triage (high-signal subset for first-pass triage; explicit -m wins, -em subtracts) (Default: full)
   -update-payloads
         Update payload files to latest version (Default: false)
 ```

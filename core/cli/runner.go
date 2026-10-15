@@ -8,6 +8,7 @@ package cli
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
 	"github.com/slicingmelon/gobypass403/core/engine/scanner"
@@ -35,6 +36,13 @@ func (r *Runner) Initialize() error {
 		return err
 	}
 	r.RunnerOptions = opts
+
+	// Addendum 4: announce non-default scan profiles so run logs are
+	// self-describing (default "full" runs print nothing extra).
+	if opts.ScanProfile == "triage" {
+		GB403Logger.Info().Msgf("Scan profile: triage (%d modules after -m/-em resolution)\n",
+			len(strings.Split(opts.Module, ",")))
+	}
 
 	// Set ResultsDBFile if not already set
 	if r.RunnerOptions.ResultsDBFile == "" {
