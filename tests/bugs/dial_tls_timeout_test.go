@@ -1,8 +1,13 @@
 package tests
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"fmt"
+	"math/big"
 	"net"
 	"testing"
 	"time"
@@ -12,26 +17,103 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+// startLocalTLSEndpoints starts two hermetic stand-ins for github.com:443
+// and github.com:80 on 127.0.0.1 ephemeral ports:
+//
+//   - a TLS endpoint: raw TLS handshakes succeed, plaintext HTTP probes are
+//     rejected by the handshake and close without an HTTP response;
+//   - a plain HTTP endpoint: raw HTTP probes get an "HTTP/1.1" response,
+//     TLS handshakes fail.
+//
+// The original tests dialed the real github.com, which fails in offline or
+// sandboxed environments with "lookup github.com: no such host". The probe
+// semantics under test — detecting TLS vs plain-HTTP endpoints — are fully
+// reproduced locally.
+func startLocalTLSEndpoints(t *testing.T) (tlsAddr, httpAddr string) {
+	t.Helper()
+
+	cert := newTestTLSCertificate(t)
+
+	// Plain HTTP endpoint (github.com:80 equivalent).
+	plainLn, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { plainLn.Close() })
+	go serveProbeEndpoint(plainLn)
+
+	// TLS endpoint (github.com:443 equivalent).
+	rawLn, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { rawLn.Close() })
+	tlsLn := tls.NewListener(rawLn, &tls.Config{Certificates: []tls.Certificate{cert}})
+	go serveProbeEndpoint(tlsLn)
+
+	return tlsLn.Addr().String(), plainLn.Addr().String()
+}
+
+// serveProbeEndpoint accepts connections until the listener closes. Each
+// connection reads one chunk of input and, only if that read succeeds,
+// replies with a minimal HTTP response — whether a probe therefore "sees
+// HTTP" depends solely on how the endpoint wraps its connections.
+func serveProbeEndpoint(ln net.Listener) {
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			return // listener closed
+		}
+		go func(conn net.Conn) {
+			defer conn.Close()
+			_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+			buf := make([]byte, 1024)
+			if _, err := conn.Read(buf); err != nil {
+				return
+			}
+			_, _ = conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))
+		}(conn)
+	}
+}
+
+// newTestTLSCertificate generates a short-lived self-signed certificate for
+// 127.0.0.1 so the local TLS endpoint can handshake without any external
+// certificate material.
+func newTestTLSCertificate(t *testing.T) tls.Certificate {
+	t.Helper()
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "gobypass403-local-tls-endpoint"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, pub, priv)
+	require.NoError(t, err)
+	leaf, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: priv, Leaf: leaf}
+}
+
 func TestTLSDialing(t *testing.T) {
+	tlsAddr, httpAddr := startLocalTLSEndpoints(t)
+
 	// Test configuration
 	testCases := []struct {
 		name     string
-		host     string
-		port     string
+		addr     string
 		wantTLS  bool
 		wantHTTP bool
 	}{
 		{
-			name:     "GitHub HTTPS Port",
-			host:     "github.com",
-			port:     "443",
+			name:     "TLS endpoint (local 443 equivalent)",
+			addr:     tlsAddr,
 			wantTLS:  true,
 			wantHTTP: false,
 		},
 		{
-			name:     "GitHub HTTP Port",
-			host:     "github.com",
-			port:     "80",
+			name:     "Plain HTTP endpoint (local 80 equivalent)",
+			addr:     httpAddr,
 			wantTLS:  false,
 			wantHTTP: true,
 		},
@@ -45,38 +127,38 @@ func TestTLSDialing(t *testing.T) {
 				DNSCacheDuration: 10 * time.Minute,
 			}
 
-			addr := net.JoinHostPort(tc.host, tc.port)
-
 			// Test TLS connection
-			tlsOK := testTLSHandshake(t, dialer, addr)
+			tlsOK := testTLSHandshake(t, dialer, tc.addr)
 			assert.Equal(t, tc.wantTLS, tlsOK, "TLS handshake result mismatch")
 
 			// Test HTTP connection
-			httpOK := testHTTPConnection(t, dialer, addr)
+			httpOK := testHTTPConnection(t, dialer, tc.addr)
 			assert.Equal(t, tc.wantHTTP, httpOK, "HTTP connection result mismatch")
 		})
 	}
 }
 
 func TestTLSDialing_IP(t *testing.T) {
+	tlsAddr, httpAddr := startLocalTLSEndpoints(t)
+
 	testCases := []struct {
 		name     string
-		domain   string // Original domain for resolution
-		port     string
+		ip       string // numeric target: resolves without DNS, keeping the resolve-then-dial flow
+		addr     string // local endpoint providing the port
 		wantTLS  bool
 		wantHTTP bool
 	}{
 		{
-			name:     "GitHub HTTPS Port",
-			domain:   "github.com",
-			port:     "443",
+			name:     "TLS endpoint (local 443 equivalent)",
+			ip:       "127.0.0.1",
+			addr:     tlsAddr,
 			wantTLS:  true,
 			wantHTTP: false,
 		},
 		{
-			name:     "GitHub HTTP Port",
-			domain:   "github.com",
-			port:     "80",
+			name:     "Plain HTTP endpoint (local 80 equivalent)",
+			ip:       "127.0.0.1",
+			addr:     httpAddr,
 			wantTLS:  false,
 			wantHTTP: true,
 		},
@@ -85,9 +167,12 @@ func TestTLSDialing_IP(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Resolve IP first
-			ips, err := net.LookupIP(tc.domain)
+			ips, err := net.LookupIP(tc.ip)
 			require.NoError(t, err, "IP lookup failed")
 			require.NotEmpty(t, ips, "No IPs resolved")
+
+			_, port, err := net.SplitHostPort(tc.addr)
+			require.NoError(t, err)
 
 			// Create dialer
 			dialer := &fasthttp.TCPDialer{
@@ -97,7 +182,7 @@ func TestTLSDialing_IP(t *testing.T) {
 
 			// Test first resolved IP
 			ip := ips[0].String()
-			addr := net.JoinHostPort(ip, tc.port)
+			addr := net.JoinHostPort(ip, port)
 			t.Logf("Testing IP: %s", addr)
 
 			// Test TLS connection

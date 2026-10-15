@@ -17,9 +17,43 @@ import (
 	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
 	GB403ErrorHandler "github.com/slicingmelon/gobypass403/core/utils/error"
 	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
 )
 
 func TestWhitespaceResponseHeaders(t *testing.T) {
+	// Hermetic transport: the original dialed a fictional public host over
+	// real TLS, which can only pass with working internet DNS and a
+	// reachable server ("lookup examplffsdf221.mp4%26: no such host"
+	// otherwise). The subjects of this test — a weird percent-encoded
+	// request-target plus response headers carrying whitespace — only need
+	// a reachable endpoint, so canned bytes are served from an in-memory
+	// listener instead.
+	ln := fasthttputil.NewInmemoryListener()
+	defer ln.Close()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return // listener closed
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buf := make([]byte, 4096)
+				if _, err := c.Read(buf); err != nil {
+					return
+				}
+				_, _ = c.Write([]byte(
+					"HTTP/1.1 200 OK\r\n" +
+						"Content-Type: text/plain\r\n" +
+						"Content-Disposition: attachment; filename=\"with spaces.mp4\"\r\n" +
+						"X-Whitespace:   padded   value   \r\n" +
+						"Content-Length: 2\r\n" +
+						"\r\n" +
+						"ok"))
+			}(conn)
+		}
+	}()
+
 	// Create fasthttp client with specified configuration
 	client := &fasthttp.Client{
 		StreamResponseBody:            false,
@@ -32,6 +66,9 @@ func TestWhitespaceResponseHeaders(t *testing.T) {
 		MaxResponseBodySize: 8092 * 2,
 		ReadBufferSize:      8092 * 2,
 		WriteBufferSize:     8092 * 2,
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
 	}
 
 	// Prepare request
@@ -46,8 +83,10 @@ func TestWhitespaceResponseHeaders(t *testing.T) {
 	req.Header.DisableNormalizing()
 	req.Header.SetNoDefaultContentType(true)
 
-	// Set request URL with special character
-	req.SetRequestURI("https://examplffsdf221.mp4%26/")
+	// Set request URL with special character (scheme switched to http: the
+	// in-memory listener serves plain HTTP; the percent-encoded host — the
+	// actual subject — is unchanged).
+	req.SetRequestURI("http://examplffsdf221.mp4%26/")
 
 	// Make the request
 	err := client.Do(req, resp)

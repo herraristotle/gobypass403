@@ -43,13 +43,17 @@ func TestInvalidHeaderValue2(t *testing.T) {
 			shouldError:        false,
 		},
 		{
+			// Current fork contract: a \n before the ':' inside a header name
+			// is rejected (errInvalidName, vanilla check retained — the
+			// GOBYPASS403 patch in that block only silences the deprecated
+			// newline-separator warning), so this response must error.
 			name:               "200 OK with custom header name containing 0x0A (line feed)",
 			targetHost:         "localhost",
 			targetPath:         "/test/data.json",
 			statusCode:         200,
 			contentDisposition: "",
 			customHeader:       "X-Random\x0aHeader: aaabbb",
-			shouldError:        false,
+			shouldError:        true,
 		},
 	}
 

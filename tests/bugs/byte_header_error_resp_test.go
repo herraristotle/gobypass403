@@ -3,15 +3,33 @@ package tests
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
 )
 
 func TestServerClosedConnectionBeforeReturningTheFirstResponseByte1(t *testing.T) {
+	// Hermetic server: accept the connection and close it without writing a
+	// single response byte. The original test dialed the real localhost:80,
+	// which succeeds whenever anything (proxy, dev server, package manager)
+	// happens to listen there — masking the error this test reproduces.
+	ln := fasthttputil.NewInmemoryListener()
+	defer ln.Close()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return // listener closed
+			}
+			conn.Close() // close before returning the first response byte
+		}
+	}()
+
 	client := &fasthttp.Client{
 		StreamResponseBody:            false,
 		DisablePathNormalizing:        true,
@@ -19,6 +37,9 @@ func TestServerClosedConnectionBeforeReturningTheFirstResponseByte1(t *testing.T
 
 		TLSConfig: &tls.Config{
 			InsecureSkipVerify: true,
+		},
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
 		},
 	}
 

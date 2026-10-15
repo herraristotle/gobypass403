@@ -27,10 +27,15 @@ func TestInvalidHeaderValue(t *testing.T) {
 			expectedErrorPrefix: "",
 		},
 		{
+			// Current fork contract: control bytes in header VALUES are
+			// accepted — vanilla fasthttp's value-validation error sites in
+			// pkg/fasthttp-client-1.64.0/header.go are commented out, so a
+			// raw 0x1E byte parses cleanly. (The original expectation
+			// documented the pre-removal rejecting behavior.)
 			name:                "With actual control character 0x1E",
 			contentDisposition:  "attachment; filename=\"file.png\x1e\"",
-			expectedError:       true,
-			expectedErrorPrefix: "error when reading response headers: invalid header value",
+			expectedError:       false,
+			expectedErrorPrefix: "",
 		},
 	}
 

@@ -1,13 +1,33 @@
 package recon
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/slicingmelon/gobypass403/core/engine/recon"
 )
 
+// requireInternetDNS skips recon tests that probe real internet hosts when
+// external DNS resolution is unavailable. The service resolves via the shared
+// CustomResolver (system resolver + public DNS servers + DoH, any-of wins);
+// when every source is unreachable — sandboxed or offline environments — the
+// service legitimately records resolution failures, the expected cache
+// entries never appear, and the tests fail (ValidateDuplicates even panics
+// on a nil cache result). Probing with the very same resolver keeps the gate
+// honest: wherever the service can resolve, the test still runs.
+func requireInternetDNS(t *testing.T) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := recon.GetSharedDialer().Resolver.LookupIPAddr(ctx, "example.com"); err != nil {
+		t.Skipf("skipping: external DNS unavailable for the recon resolver: %v", err)
+	}
+}
+
 func TestReconService_Run(t *testing.T) {
+	requireInternetDNS(t)
+
 	service := recon.NewReconService()
 
 	testURLs := []string{
@@ -111,6 +131,8 @@ func TestReconService_Run(t *testing.T) {
 }
 
 func TestReconService_Run_ValidateDuplicates(t *testing.T) {
+	requireInternetDNS(t)
+
 	service := recon.NewReconService()
 
 	testURLs := []string{
