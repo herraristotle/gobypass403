@@ -14,22 +14,15 @@ import (
 	"github.com/valyala/fasthttp/fasthttputil"
 )
 
-// setupInMemoryServer creates a fasthttp server with in-memory listener
-func setupInMemoryServer() (*fasthttp.Server, *fasthttputil.InmemoryListener) {
+// setupInMemoryServer starts a raw canned-response server (200 "OK") on an
+// in-memory listener. The vendored fasthttp fork is client-only — there is no
+// fasthttp.Server — so the returned stand-in's Shutdown() just closes the
+// listener, which stops the accept loop (see bench_server_test.go).
+func setupInMemoryServer() (*benchServer, *fasthttputil.InmemoryListener) {
 	ln := fasthttputil.NewInmemoryListener()
-
-	server := &fasthttp.Server{
-		Handler: func(ctx *fasthttp.RequestCtx) {
-			ctx.SetStatusCode(fasthttp.StatusOK)
-			ctx.SetBodyString("OK")
-		},
-		ReadTimeout:  time.Second,
-		WriteTimeout: time.Second,
-	}
-
-	go server.Serve(ln)
-
-	return server, ln
+	resp := rawBenchResp("200 OK", "text/plain", "OK")
+	serveBench(ln, func() []byte { return resp })
+	return &benchServer{ln: ln, stop: func() { _ = ln.Close() }}, ln
 }
 
 // BenchmarkDoRequest benchmarks the DoRequest function with different payload sizes
@@ -39,6 +32,10 @@ func BenchmarkDoRequest(b *testing.B) {
 	defer ln.Close()
 
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
+	// Benchmarks disable response streaming: with the fork's streaming default
+	// the pooled conn is only released once the body is drained, and these
+	// benchmarks never read bodies (they would exhaust MaxConnsPerHost).
+	clientOpts.StreamResponseBody = false
 	clientOpts.Dialer = func(addr string) (net.Conn, error) {
 		return ln.Dial()
 	}
@@ -88,6 +85,10 @@ func BenchmarkDoRequestAllocs(b *testing.B) {
 	defer ln.Close()
 
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
+	// Benchmarks disable response streaming: with the fork's streaming default
+	// the pooled conn is only released once the body is drained, and these
+	// benchmarks never read bodies (they would exhaust MaxConnsPerHost).
+	clientOpts.StreamResponseBody = false
 	clientOpts.Dialer = func(addr string) (net.Conn, error) {
 		return ln.Dial()
 	}
@@ -122,6 +123,10 @@ func BenchmarkDoRequestAllocsDetailed(b *testing.B) {
 	defer ln.Close()
 
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
+	// Benchmarks disable response streaming: with the fork's streaming default
+	// the pooled conn is only released once the body is drained, and these
+	// benchmarks never read bodies (they would exhaust MaxConnsPerHost).
+	clientOpts.StreamResponseBody = false
 	clientOpts.Dialer = func(addr string) (net.Conn, error) {
 		return ln.Dial()
 	}
@@ -173,6 +178,10 @@ func BenchmarkRequestComponents(b *testing.B) {
 	defer ln.Close()
 
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
+	// Benchmarks disable response streaming: with the fork's streaming default
+	// the pooled conn is only released once the body is drained, and these
+	// benchmarks never read bodies (they would exhaust MaxConnsPerHost).
+	clientOpts.StreamResponseBody = false
 	clientOpts.Dialer = func(addr string) (net.Conn, error) {
 		return ln.Dial()
 	}
@@ -227,27 +236,26 @@ func BenchmarkRequestComponents(b *testing.B) {
 // BenchmarkDoRequestWithRetry benchmarks DoRequest with retry mechanism
 func BenchmarkDoRequestWithRetry(b *testing.B) {
 	var failCount int32
-	server := &fasthttp.Server{
-		Handler: func(ctx *fasthttp.RequestCtx) {
-			if atomic.AddInt32(&failCount, 1)%3 == 0 {
-				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
-				return
-			}
-			ctx.SetStatusCode(fasthttp.StatusOK)
-			ctx.SetBodyString("OK")
-		},
-	}
-
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	go server.Serve(ln)
-	defer server.Shutdown()
+	// Same cadence as the old fasthttp.Server handler: every 3rd request 503.
+	resp503 := rawBenchResp("503 Service Unavailable", "text/plain", "")
+	resp200 := rawBenchResp("200 OK", "text/plain", "OK")
+	serveBench(ln, func() []byte {
+		if atomic.AddInt32(&failCount, 1)%3 == 0 {
+			return resp503
+		}
+		return resp200
+	})
 
 	clientOpts := &rawhttp.HTTPClientOptions{
 		Timeout:    5 * time.Second,
 		MaxRetries: 3,
 		RetryDelay: 100 * time.Millisecond,
+		// See the StreamResponseBody note above: keep pooled conns reusable
+		// for benchmarks that never drain response bodies.
+		StreamResponseBody: false,
 		Dialer: func(addr string) (net.Conn, error) {
 			return ln.Dial()
 		},
@@ -279,6 +287,10 @@ func BenchmarkDoRequestWithDifferentMethods(b *testing.B) {
 	defer ln.Close()
 
 	clientOpts := rawhttp.DefaultHTTPClientOptions()
+	// Benchmarks disable response streaming: with the fork's streaming default
+	// the pooled conn is only released once the body is drained, and these
+	// benchmarks never read bodies (they would exhaust MaxConnsPerHost).
+	clientOpts.StreamResponseBody = false
 	clientOpts.Dialer = func(addr string) (net.Conn, error) {
 		return ln.Dial()
 	}

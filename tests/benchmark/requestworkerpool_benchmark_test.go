@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
@@ -79,18 +80,13 @@ func BenchmarkProcessRequests3(b *testing.B) {
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	// Start mock server
-	go func() {
-		err := fasthttp.Serve(ln, func(ctx *fasthttp.RequestCtx) {
-			ctx.SetStatusCode(200)
-			ctx.SetBodyString("<!DOCTYPE html><html><head><title>Test Page</title></head><body>test response body</body></html>")
-			ctx.Response.Header.SetContentType("text/html")
-			ctx.Response.Header.Set("Server", "test-server")
-		})
-		if err != nil {
-			b.Error(err)
-		}
-	}()
+	// Start mock server: raw canned response (the vendored fasthttp fork is
+	// client-only — fasthttp.Serve/fasthttp.RequestCtx don't exist).
+	body := "<!DOCTYPE html><html><head><title>Test Page</title></head><body>test response body</body></html>"
+	respBytes := []byte(fmt.Sprintf(
+		"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nServer: test-server\r\nContent-Length: %d\r\n\r\n%s",
+		len(body), body))
+	serveBench(ln, func() []byte { return respBytes })
 
 	// Create custom client options with mock dialer
 	opts := rawhttp.DefaultHTTPClientOptions()
