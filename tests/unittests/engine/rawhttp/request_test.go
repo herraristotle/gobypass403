@@ -3,9 +3,7 @@ package tests
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"net"
-	"sync"
 	"testing"
 	"time"
 
@@ -29,45 +27,9 @@ func TestRequestBuilderViaEchoServer(t *testing.T) {
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	var mu sync.Mutex
-
-	serverReady := make(chan struct{})
-	serverErr := make(chan error, 1)
-
-	// Setup test server that echoes back raw request
-	s := &fasthttp.Server{
-		Handler: func(ctx *fasthttp.RequestCtx) {
-			mu.Lock()
-			defer mu.Unlock()
-
-			ctxLogger := ctx.Logger()
-			ctxLogger.Printf("[ctxLogger]Request received!")
-			// Get the raw request directly from ctx.Request (pointer)
-			req := &ctx.Request
-			reqHeader := &ctx.Request.Header
-
-			fmt.Fprintf(ctx, "Raw request is:\n==>\n%s\n<==\n", req)
-
-			ctx.Success("text/html", []byte(fmt.Sprintf("requestURI=%s, body=%s", reqHeader.RequestURI(), req.Body())))
-
-		},
-		ReadTimeout:                   5 * time.Second,
-		WriteTimeout:                  5 * time.Second,
-		DisableHeaderNamesNormalizing: true,
-	}
-
-	// Start server with proper error handling
-	go func() {
-		close(serverReady)
-		if err := s.Serve(ln); err != nil {
-			select {
-			case serverErr <- err:
-			default:
-			}
-		}
-	}()
-
-	<-serverReady // Wait for server to start
+	// Raw echo server. The vendored fasthttp fork is client-only (no
+	// fasthttp.Server), so the echo behavior lives in echo_server_test.go.
+	serverErr := serveInmemory(ln, echoRespFn)
 
 	// Create test client with custom dialer
 	clientoptions := rawhttp.DefaultHTTPClientOptions()
@@ -85,7 +47,7 @@ func TestRequestBuilderViaEchoServer(t *testing.T) {
 		{
 			name:         "HeaderIP Payloads",
 			targetURL:    "http://example.com/test",
-			bypassModule: "http_headers_ip",
+			bypassModule: "headers_ip",
 		},
 		{
 			name:         "MidPaths Payloads",
@@ -95,7 +57,7 @@ func TestRequestBuilderViaEchoServer(t *testing.T) {
 		{
 			name:         "HeaderScheme Payloads",
 			targetURL:    "http://example.com/admin",
-			bypassModule: "http_headers_scheme",
+			bypassModule: "headers_scheme",
 		},
 	}
 
@@ -147,6 +109,11 @@ func TestRequestBuilderViaEchoServer(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Job %d failed: %v", i, err)
 				}
+				// StreamResponseBody is on by default: the pooled connection is
+				// released only once the body stream is drained. resp.Body()
+				// consumes it — without this the pool exhausts at
+				// MaxConnsPerHost (128) with ErrNoFreeConns.
+				_ = resp.Body()
 
 				// // Log only on failure to reduce output
 				// if !bytes.Contains(echoedRequest, []byte(job.Method+" "+job.RawURI)) {
@@ -186,54 +153,8 @@ func TestRequestBuilderMidPathsPayloads(t *testing.T) {
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	var mu sync.Mutex
-
-	serverReady := make(chan struct{})
-	serverErr := make(chan error, 1)
-
-	// Setup test server that echoes back raw request
-	s := &fasthttp.Server{
-		Handler: func(ctx *fasthttp.RequestCtx) {
-			mu.Lock()
-			defer mu.Unlock()
-
-			ctx.Request.URI().DisablePathNormalizing = true
-
-			//ctxLogger := ctx.Logger()
-
-			// Get the raw request directly from ctx.Request (pointer)
-			incomingRequest := &ctx.Request
-			//incomingRequestHeader := &ctx.Request.Header
-
-			incomingRequest.URI().DisablePathNormalizing = true
-
-			//ctxLogger.Printf("[ctxLogger] Request received!")
-			// Combine both outputs in the response
-			responseText := fmt.Sprintf(
-				"[fasthttpServer] How I receved the request:\n================\n%s\n<================\nrequestURI=%s, body=%s\n<================",
-				incomingRequest,
-				incomingRequest.URI().RequestURI(),
-				incomingRequest.Body(),
-			)
-			ctx.Success("text/html", []byte(responseText))
-		},
-		ReadTimeout:                   5 * time.Second,
-		WriteTimeout:                  5 * time.Second,
-		DisableHeaderNamesNormalizing: true,
-	}
-
-	// Start server with proper error handling
-	go func() {
-		close(serverReady)
-		if err := s.Serve(ln); err != nil {
-			select {
-			case serverErr <- err:
-			default:
-			}
-		}
-	}()
-
-	<-serverReady
+	// Raw echo server (see echo_server_test.go).
+	serverErr := serveInmemory(ln, echoRespFn)
 
 	// Create test client with custom dialer
 	clientoptions := rawhttp.DefaultHTTPClientOptions()
@@ -312,22 +233,25 @@ func TestRequestBuilderHostHeaders(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	clientOpts := rawhttp.DefaultHTTPClientOptions()
+	// Hermetic raw echo server: the Host override is asserted against the
+	// bytes the server actually received, instead of dialing the public
+	// internet with a malformed URL (the old test set RawURI to an absolute
+	// URL, yielding "http://google.comhttps://example.com").
+	ln := fasthttputil.NewInmemoryListener()
+	defer ln.Close()
+	serveInmemory(ln, echoRespFn)
 
+	clientOpts := rawhttp.DefaultHTTPClientOptions()
+	clientOpts.Dialer = func(addr string) (net.Conn, error) {
+		return ln.Dial()
+	}
 	client := rawhttp.NewHTTPClient(clientOpts)
-	//rb := NewRequestBuilder(client, _logger)
 
 	testCases := []struct {
 		name string
-		url  string
 	}{
-		// {
-		// 	name: "Basic GET Request",
-		// 	url:  "http://httpbin.org/get",
-		// },
 		{
-			name: "HTTPS GET Request",
-			url:  "https://example.com",
+			name: "Host Header Override",
 		},
 	}
 
@@ -341,8 +265,8 @@ func TestRequestBuilderHostHeaders(t *testing.T) {
 			// Create minimal payload job with just Method and FullURL
 			job := payload.BypassPayload{
 				Method: "GET",
-				Host:   "google.com",
-				RawURI: tc.url,
+				Host:   "example.com",
+				RawURI: "/admin",
 				Headers: []payload.Headers{
 					{Header: "Host", Value: "yahoo.com"},
 				},
@@ -370,9 +294,15 @@ func TestRequestBuilderHostHeaders(t *testing.T) {
 				t.Fatalf("Request failed: %v", err)
 			}
 
-			// Verify response
-			statusCode := resp.StatusCode()
-			GB403Logger.PrintGreen("Response Status Code: %d", statusCode)
+			// Drain the streamed body (releases the pooled connection) and
+			// verify the server saw both a 200 and the overridden Host.
+			body := resp.Body()
+			if resp.StatusCode() != 200 {
+				t.Errorf("Expected status 200 from echo server, got %d", resp.StatusCode())
+			}
+			if !bytes.Contains(body, []byte("Host: yahoo.com")) {
+				t.Errorf("Overridden Host header not received by server; body:\n%s", body)
+			}
 		})
 	}
 }
@@ -382,36 +312,12 @@ func TestResponseProcessingWithSpacedHeaders(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	// Create test server
-	handler := func(ctx *fasthttp.RequestCtx) {
-		testCase := string(ctx.Request.Header.Peek("X-Test-Case"))
-		switch testCase {
-		case "content-disposition":
-			ctx.Response.Header.Set("Content-Disposition", "attachment; filename=\"test file.pdf\"")
-			ctx.Response.Header.Set("Content-Type", "application/pdf")
-			ctx.SetStatusCode(200)
-			ctx.SetBody([]byte("PDF content with special chars: áéíóú"))
-		case "csp-header":
-			ctx.Response.Header.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://example.com")
-			ctx.Response.Header.Set("Content-Type", "text/html; charset=utf-8")
-			ctx.SetStatusCode(200)
-			ctx.SetBody([]byte("<html><head><title>Test Page</title></head><body>Test content with spaces and special chars: áéíóú</body></html>"))
-		case "malformed-response":
-			// Test case for malformed response
-			ctx.Response.SetBodyString("nction() {\n\treturn this.href")
-			ctx.Response.Header.SetContentType("text/html")
-			ctx.SetStatusCode(200)
-		}
-	}
-
+	// Canned-response server (see echo_server_test.go) — serves the fixed
+	// Content-Disposition / CSP / malformed responses selected by X-Test-Case.
 	ln := fasthttputil.NewInmemoryListener()
 	defer ln.Close()
 
-	s := &fasthttp.Server{
-		Handler:                       handler,
-		DisableHeaderNamesNormalizing: true,
-	}
-	go s.Serve(ln) //nolint:errcheck
+	serveInmemory(ln, cannedRespFn)
 
 	clientoptions := rawhttp.DefaultHTTPClientOptions()
 	clientoptions.Dialer = func(addr string) (net.Conn, error) {
