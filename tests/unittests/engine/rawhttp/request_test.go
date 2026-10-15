@@ -416,3 +416,32 @@ func TestResponseProcessingWithSpacedHeaders(t *testing.T) {
 		})
 	}
 }
+
+// TestBuildRawHTTPRequestPreservesMethodCase pins the exact request-line
+// method bytes: fasthttp's request-line parse must not canonicalize the
+// http_methods module's lowercase twins ("get" vs "GET"). Verbatim wire
+// behavior was verified against the unKover testbed (local capture shows
+// "get /x HTTP/1.1" intact; the engine's results DB records -X get -> 200
+// on /access/apache/records in every run — the findings TABLE's 5-row
+// group cap is what hid it, not the transport).
+func TestBuildRawHTTPRequestPreservesMethodCase(t *testing.T) {
+	clientOpts := rawhttp.DefaultHTTPClientOptions()
+	client := rawhttp.NewHTTPClient(clientOpts)
+	defer client.Close()
+
+	job := payload.BypassPayload{
+		Method: "get",
+		Host:   "example.com",
+		RawURI: "/records",
+	}
+
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+
+	if err := rawhttp.BuildRawHTTPRequest(client, req, job); err != nil {
+		t.Fatalf("BuildRawHTTPRequest failed: %v", err)
+	}
+	if got := string(req.Header.Method()); got != "get" {
+		t.Errorf("request-line method = %q, want %q (lowercase twins must survive the parse)", got, "get")
+	}
+}
