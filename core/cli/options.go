@@ -32,7 +32,7 @@ type CliOptions struct {
 	// Scan configuration
 	Module                   string
 	ExcludeModule            string
-	ScanProfile              string   // -scan-profile preset: full (default) | triage (Addendum 4)
+	ScanProfile              string // -scan-profile preset: full (default) | triage (Addendum 4)
 	MatchStatusCodesStr      string
 	MatchStatusCodes         []int
 	MatchContentType         string   // New field for multiple types
@@ -90,6 +90,10 @@ type CliOptions struct {
 	// ResendRequest
 	ResendRequest string
 	ResendNum     int
+
+	// Offline analysis (Addendum 5 Phase A)
+	AnalyzeDB   string // -analyze: existing results DB to analyze (read-only)
+	AnalyzeJSON string // -analyze-json: also write the JSON report to this file
 
 	//UpdatePayloads
 	UpdatePayloads bool
@@ -298,6 +302,14 @@ func (o *CliOptions) setDefaults() {
 
 // validate performs all validation checks
 func (o *CliOptions) validate() error {
+	// Offline analysis mode (-analyze / -analyze-json) is self-contained,
+	// read-only and takes no scan inputs: it sets up no outdir/DB, reads no
+	// URLs and never touches the payloads or the network, so it returns
+	// before every scan-oriented check below.
+	if o.AnalyzeDB != "" || o.AnalyzeJSON != "" {
+		return o.validateAnalyze()
+	}
+
 	// Validate -scan-profile value first (pure flag syntax; full | triage;
 	// empty normalized by setDefaults)
 	if o.ScanProfile != "full" && o.ScanProfile != "triage" {
@@ -435,6 +447,25 @@ func (o *CliOptions) validate() error {
 		}
 	}
 
+	return nil
+}
+
+// validateAnalyze validates offline analysis mode. Analysis reads an
+// existing findings DB and exits; every other scan input is meaningless
+// there, so mixing them is an error rather than a silently ignored flag.
+func (o *CliOptions) validateAnalyze() error {
+	if o.AnalyzeDB == "" {
+		return fmt.Errorf("-analyze-json requires -analyze <results.db>")
+	}
+	if o.URL != "" || o.URLsFile != "" || o.SubstituteHostsFile != "" {
+		return fmt.Errorf("-analyze cannot be used with -u/--url, -l/--url-file or -s/--substitute-hosts-file")
+	}
+	if o.ResendRequest != "" {
+		return fmt.Errorf("-analyze cannot be used with -r/--resend")
+	}
+	if o.UpdatePayloads {
+		return fmt.Errorf("-analyze cannot be used with -update-payloads")
+	}
 	return nil
 }
 

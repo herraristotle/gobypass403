@@ -37,6 +37,14 @@ func (r *Runner) Initialize() error {
 	}
 	r.RunnerOptions = opts
 
+	// Offline analysis mode (Addendum 5 Phase A): read an existing findings
+	// DB and print/serialize the differential report, then stop. Placed
+	// before the outdir DB and the scanner exist, so analysis creates no
+	// output database and performs no recon or network requests.
+	if opts.AnalyzeDB != "" {
+		return r.handleAnalyze()
+	}
+
 	// Addendum 4: announce non-default scan profiles so run logs are
 	// self-describing (default "full" runs print nothing extra).
 	if opts.ScanProfile == "triage" {
@@ -128,6 +136,12 @@ func (r *Runner) Initialize() error {
 func (r *Runner) Run() error {
 	// If resend request was handled in Initialize, exit here
 	if r.RunnerOptions.ResendRequest != "" {
+		return nil
+	}
+
+	// If offline analysis was handled in Initialize, exit here (the report
+	// is already printed; there is nothing to scan)
+	if r.RunnerOptions.AnalyzeDB != "" {
 		return nil
 	}
 

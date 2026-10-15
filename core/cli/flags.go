@@ -105,6 +105,8 @@ func parseFlags() (*CliOptions, error) {
 		{name: "dpb,disable-progress-bar", usage: "Disable progress bar", value: &opts.DisableProgressBar, defVal: false},
 		{name: "r,resend,resend-request", usage: "Resend the exact request using the debug token (example: -r xyzdebugtoken)", value: &opts.ResendRequest},
 		{name: "rn,resend-num,resend-request-num", usage: "Number of times to resend the debugged request", value: &opts.ResendNum, defVal: 1},
+		{name: "analyze", usage: "Analyze an existing results database offline (read-only) and print the differential report, then exit (example: -analyze /tmp/scan/results.db)", value: &opts.AnalyzeDB},
+		{name: "analyze-json", usage: "With -analyze: also write the report as JSON to this file (example: -analyze-json /tmp/report.json)", value: &opts.AnalyzeJSON},
 		{name: "profile", usage: "Enable pprof profiler", value: &opts.Profile, defVal: false},
 		{name: "scan-profile", usage: "Scan scope preset: full (all bypass modules) or triage (high-signal subset for first-pass triage; explicit -m wins, -em subtracts)", value: &opts.ScanProfile, defVal: "full"},
 		{name: "update-payloads", usage: "Update payload files to latest version", value: &opts.UpdatePayloads, defVal: false},
