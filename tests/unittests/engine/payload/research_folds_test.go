@@ -129,3 +129,96 @@ func TestPortsFoldIn74443(t *testing.T) {
 	}
 	t.Error("headers_port missing folded-in port 74443")
 }
+
+// Parallax wordlists/headers.txt straggler fold: the full mechanical diff
+// (1,131 parallax names, 77 already covered by the 206-name spoofing
+// universe, 1,054 parallax-only) filtered down to 14 conservative,
+// real-world names that fit an existing family and registry:
+// scheme/proto indicators -> header_proto_schemes.lst,
+// URL/referer/redirect indicators -> header_urls.lst,
+// client/host identity -> header_ip_hosts.lst,
+// method override -> header_http_methods.lst.
+var parallaxProtoStragglers = []string{
+	"Forwarded-Proto", "X-Forwarded-Protocol", "X-Forward-Proto",
+	"X-Originally-Forwarded-Proto", "X-Https", "X-Scheme",
+}
+
+var parallaxURLStragglers = []string{
+	"Coming-From", "X-Coming-From", "X-XHR-Referer",
+	"X-Amz-Website-Redirect-Location",
+}
+
+var parallaxIPStragglers = []string{
+	"ClientIP", "X-ClientIP", "X-Amzn-Remapped-Host",
+}
+
+var parallaxMethodStragglers = []string{"X-Original-HTTP-Command"}
+
+// TestParallaxHeadersStragglerFold14 pins all 14 folded-in names at the
+// payload layer: each must reach the wire under its module, X-Https must
+// take the "on" value alongside Front-End-Https/X-Forwarded-SSL, and
+// Forwarded-Proto must take a bare scheme (proto= formatting is reserved
+// for the exact "Forwarded" header).
+func TestParallaxHeadersStragglerFold14(t *testing.T) {
+	schemeJobs := generateModule(t, "headers_scheme", "https://example.com/admin")
+	schemeSeen := make(map[string]string) // header -> one observed value
+	for _, j := range schemeJobs {
+		if len(j.Headers) == 1 {
+			if _, ok := schemeSeen[j.Headers[0].Header]; !ok {
+				schemeSeen[j.Headers[0].Header] = j.Headers[0].Value
+			}
+		}
+	}
+	for _, h := range parallaxProtoStragglers {
+		if _, ok := schemeSeen[h]; !ok {
+			t.Errorf("headers_scheme missing folded-in header %q", h)
+		}
+	}
+	if v, ok := schemeSeen["X-Https"]; !ok {
+		// presence already reported above
+	} else if v != "on" {
+		t.Errorf("X-Https value = %q, want \"on\" (Front-End-Https class)", v)
+	}
+	if v, ok := schemeSeen["Forwarded-Proto"]; ok && strings.Contains(v, "=") {
+		t.Errorf("Forwarded-Proto value = %q, want a bare scheme (proto= is reserved for Forwarded)", v)
+	}
+
+	urlJobs := generateModule(t, "headers_url", "https://example.com/admin")
+	urlSeen := make(map[string]bool)
+	for _, j := range urlJobs {
+		if len(j.Headers) == 1 {
+			urlSeen[j.Headers[0].Header] = true
+		}
+	}
+	for _, h := range parallaxURLStragglers {
+		if !urlSeen[h] {
+			t.Errorf("headers_url missing folded-in header %q", h)
+		}
+	}
+
+	ipJobs := generateModule(t, "headers_ip", "https://example.com/admin")
+	ipSeen := make(map[string]bool)
+	for _, j := range ipJobs {
+		for _, h := range j.Headers {
+			ipSeen[h.Header] = true
+		}
+	}
+	for _, h := range parallaxIPStragglers {
+		if !ipSeen[h] {
+			t.Errorf("headers_ip missing folded-in header %q", h)
+		}
+	}
+
+	methodJobs := generateModule(t, "headers_method", "https://example.com/admin")
+	methodSeen := make(map[string]bool)
+	for _, j := range methodJobs {
+		for _, h := range j.Headers {
+			methodSeen[h.Header] = true
+		}
+	}
+	for _, h := range parallaxMethodStragglers {
+		if !methodSeen[h] {
+			t.Errorf("headers_method missing folded-in header %q", h)
+		}
+	}
+}

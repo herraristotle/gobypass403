@@ -18,6 +18,7 @@ var methodOverrideHeaders = []string{
 	"X-HTTP-Method",
 	"X-HTTP-Method-Override",
 	"X-Method-Override",
+	"X-Original-HTTP-Command",
 }
 
 // TestHeadersMethodGeneration pins the headers_method module (addendum 3,
@@ -36,9 +37,9 @@ func TestHeadersMethodGeneration(t *testing.T) {
 		t.Fatal("headers_method generated no payloads")
 	}
 
-	wantCount := len(methodOverrideHeaders) * len(methodOverrideValues) // 21
+	wantCount := len(methodOverrideHeaders) * len(methodOverrideValues) // 28
 	if len(jobs) != wantCount {
-		t.Errorf("generated %d payloads, want %d (3 headers × 7 methods)", len(jobs), wantCount)
+		t.Errorf("generated %d payloads, want %d (4 headers × 7 methods)", len(jobs), wantCount)
 	}
 
 	seen := make(map[string]bool)

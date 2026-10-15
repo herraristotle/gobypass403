@@ -8,3 +8,9 @@ X-Forwarded-Scheme
 X-Protocol-Scheme
 X-Sp-Edge-Scheme
 X-Url-Scheme
+Forwarded-Proto
+X-Forwarded-Protocol
+X-Forward-Proto
+X-Originally-Forwarded-Proto
+X-Https
+X-Scheme

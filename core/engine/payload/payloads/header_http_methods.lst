@@ -1,3 +1,4 @@
 X-HTTP-Method
 X-HTTP-Method-Override
 X-Method-Override
+X-Original-HTTP-Command

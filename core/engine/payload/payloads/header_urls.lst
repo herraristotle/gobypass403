@@ -55,3 +55,7 @@ X-ProxyPath
 X-Target-URI
 X-Target-Path
 Referrer
+Coming-From
+X-Coming-From
+X-XHR-Referer
+X-Amz-Website-Redirect-Location

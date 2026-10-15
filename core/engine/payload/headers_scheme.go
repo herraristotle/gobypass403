@@ -65,6 +65,7 @@ func (pg *PayloadGenerator) GenerateHeadersSchemePayloads(targetURL string, bypa
 		"Front-End-Https":   {},
 		"X-Forwarded-HTTPS": {},
 		"X-Forwarded-SSL":   {},
+		"X-Https":           {}, // parallax fold: same toggle class as Front-End-Https
 	}
 
 	for _, headerScheme := range headerSchemes {
