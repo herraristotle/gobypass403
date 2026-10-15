@@ -14,9 +14,22 @@ package tests
 
 import (
 	"testing"
+	"unsafe"
 
 	"github.com/slicingmelon/gobypass403/core/engine/analysis"
 )
+
+// TestObservationStaysAFingerprint pins the memory contract of the live path:
+// the scan keeps one Observation per response, so it must stay a fingerprint.
+// Adding a response-body field here would make classifying a 6.5k-payload
+// module mid-scan cost tens of MB instead of a couple of MB.
+func TestObservationStaysAFingerprint(t *testing.T) {
+	// Measured 88 bytes (fingerprint 48 + module/curl strings + ref) on
+	// linux/amd64; the bound only catches a body-sized field being added.
+	if n := unsafe.Sizeof(analysis.Observation{}); n > 128 {
+		t.Errorf("analysis.Observation is %d bytes; it must not grow to retain response bodies", n)
+	}
+}
 
 func TestFingerprintFromMatchesRowFingerprint(t *testing.T) {
 	rows := []analysis.Row{
@@ -140,6 +153,9 @@ func TestClassifyObservationsRefsPointAtMembers(t *testing.T) {
 	// Representative is the lexicographically smallest curl.
 	if b.Representative.CurlCMD != "curl aaa" {
 		t.Errorf("representative = %q, want %q", b.Representative.CurlCMD, "curl aaa")
+	}
+	if b.RepresentativeRef != 2 {
+		t.Errorf("representative ref = %d, want 2 (the ref of %q)", b.RepresentativeRef, "curl aaa")
 	}
 	if b.Representative.BypassModule != "http_methods" {
 		t.Errorf("representative module = %q, want http_methods", b.Representative.BypassModule)

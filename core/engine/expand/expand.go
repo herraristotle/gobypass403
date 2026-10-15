@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/slicingmelon/gobypass403/core/engine/analysis"
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
 )
 
@@ -178,6 +179,40 @@ func Mutate(req Request, composer Composer, budget int) []payload.BypassPayload 
 	}
 
 	return out
+}
+
+// Decide returns the request to expand for a module batch that has just
+// finished: the highest-ranked BYPASS cluster that includes at least one
+// member of that batch. batchFrom is the index of the first payload the batch
+// contributed to refs, so a cluster made of baseline (dumb_check) rows alone
+// is never expanded and an earlier module's hit is never expanded twice.
+//
+// ok is false when there is nothing to expand: unsupported module, no BYPASS
+// cluster, no BYPASS member from this batch, or an out-of-range ref.
+func Decide(module string, report analysis.TargetReport, refs []payload.BypassPayload, batchFrom int) (payload.BypassPayload, bool) {
+	if !Supported(module) {
+		return payload.BypassPayload{}, false
+	}
+	for _, c := range report.Clusters {
+		if c.Class != analysis.ClassBypass {
+			continue
+		}
+		inBatch := false
+		for _, ref := range c.Refs {
+			if ref >= batchFrom {
+				inBatch = true
+				break
+			}
+		}
+		if !inBatch {
+			continue
+		}
+		if c.RepresentativeRef < 0 || c.RepresentativeRef >= len(refs) {
+			return payload.BypassPayload{}, false
+		}
+		return refs[c.RepresentativeRef], true
+	}
+	return payload.BypassPayload{}, false
 }
 
 // requestKey identifies a full request shape for dedupe purposes: the

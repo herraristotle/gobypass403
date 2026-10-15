@@ -16,6 +16,7 @@ import (
 
 	"fortio.org/progressbar"
 	"github.com/slicingmelon/go-rawurlparser"
+	"github.com/slicingmelon/gobypass403/core/engine/analysis"
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
 	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
 	"github.com/slicingmelon/gobypass403/core/utils/helpers"
@@ -261,6 +262,23 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 		return 0
 	}
 
+	// -expand: fingerprint every response this batch sends, even the ones the
+	// display filters drop, so the target's baseline is available and a
+	// confirmed hit is recognisable without -mc.
+	var expandIdx map[string]int
+	expandBaseURL := ""
+	if s.expand.enabled {
+		s.expand.startTarget(targetURL)
+		s.expand.startBatch()
+		expandIdx = make(map[string]int, totalJobs)
+		for i := range allJobs {
+			expandIdx[allJobs[i].PayloadToken] = i
+		}
+		if parsed, err := rawurlparser.RawURLParse(targetURL); err == nil {
+			expandBaseURL = parsed.Scheme + "://" + parsed.Host
+		}
+	}
+
 	// Print bypass module info
 	GB403Logger.PrintBypassModuleInfo(bypassModule, totalJobs, targetURL)
 
@@ -299,6 +317,14 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 			maxConcurrentReqs, currentRate, avgRate, completed, uint64(totalJobs),
 		)
 		bar.WriteAbove(msg)
+
+		// -expand: observe before the display filters drop the response
+		// (a -mc 200 run must still see the dumb_check denial).
+		if s.expand.enabled {
+			if idx, ok := expandIdx[string(response.DebugToken)]; ok {
+				s.expand.observe(response, allJobs[idx])
+			}
+		}
 
 		// Check status code - if no match, skip
 		if !matchStatusCodes(response.StatusCode, s.scannerOpts.MatchStatusCodes) {
@@ -381,6 +407,21 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 	fmt.Println()
 
 	dbWg.Wait()
+
+	// -expand: the batch that just finished may have confirmed a hit. Decide
+	// here; the derived batch is sent by expandBatch.
+	if s.expand.enabled {
+		if bypassModule == analysis.BaselineDumbCheck {
+			s.expand.finishBaseline()
+		} else if derived := s.expand.decide(bypassModule, targetURL, moduleComposer{
+			opts: s.scannerOpts, module: bypassModule, baseURL: expandBaseURL,
+			method: method, body: body,
+		}); len(derived) > 0 {
+			GB403Logger.Info().Msgf(
+				"Expansion: derived %d requests around a confirmed hit in %s (%d budget left for this target)",
+				len(derived), bypassModule, s.expand.budget)
+		}
+	}
 
 	return int(resultCount.Load())
 }

@@ -48,6 +48,7 @@ type ScannerOpts struct {
 	Body                      string                 // Request body for base requests (default none)
 	ParsedRequest             *rawhttp.ParsedRequest // Base request imported via --request-file (issue #2, phase 2)
 	ReconCache                *recon.ReconCache
+	Expand                    bool // -expand: derive a bounded depth-1 batch around a confirmed hit (Addendum 5 Phase B)
 }
 
 // Scanner represents the main scanner structure, perhaps the highest level in the hierarchy of the tool
@@ -55,6 +56,7 @@ type Scanner struct {
 	scannerOpts        *ScannerOpts
 	urls               []string
 	progressBarEnabled atomic.Bool
+	expand             expandState
 }
 
 // NewScanner creates a new Scanner instance
@@ -64,6 +66,7 @@ func NewScanner(opts *ScannerOpts, urls []string) *Scanner {
 		urls:        urls,
 	}
 	s.progressBarEnabled.Store(!opts.DisableProgressBar)
+	s.expand = newExpandState(opts.Expand)
 
 	return s
 }

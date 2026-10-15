@@ -490,7 +490,7 @@ func groupCurlTokens(tokens []string) []string {
 	flagsWithArgs := map[string]bool{
 		"-H": true, "--header": true,
 		"--request-target": true,
-		"-X": true, "--request": true,
+		"-X":               true, "--request": true,
 		"-A": true, "--user-agent": true,
 		"-b": true, "--cookie": true,
 		"-d": true, "--data": true,
@@ -499,7 +499,7 @@ func groupCurlTokens(tokens []string) []string {
 		"-u": true, "--user": true,
 		"-x": true, "--proxy": true,
 		"--connect-to": true,
-		"--resolve": true,
+		"--resolve":    true,
 	}
 
 	groups := make([]string, 0, len(tokens))
@@ -560,4 +560,3 @@ func parseCurlTokens(curlCmd string) []string {
 
 	return tokens
 }
-

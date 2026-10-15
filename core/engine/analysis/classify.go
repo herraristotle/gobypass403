@@ -82,6 +82,11 @@ type Cluster struct {
 	// path only). Members is empty there: the scanner already holds its own
 	// job array and must not be duplicated.
 	Refs []int `json:"refs,omitempty"`
+	// RepresentativeRef is the caller's own index (Observation.Ref) of the
+	// representative member, so the caller can recover the request it sent
+	// (needed to derive expansion payloads). Meaningful for observation-built
+	// clusters; the Row path carries the Representative itself.
+	RepresentativeRef int `json:"representative_ref,omitempty"`
 }
 
 // TargetReport is the analysis of one target_url.
@@ -193,6 +198,7 @@ func ClassifyObservations(targetURL string, obs []Observation) TargetReport {
 			cl.Refs = append(cl.Refs, m.ref)
 		}
 		rep := c.members[c.rep]
+		cl.RepresentativeRef = rep.ref
 		cl.Representative = Row{
 			TargetURL:     targetURL,
 			BypassModule:  rep.module,
