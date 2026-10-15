@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -89,7 +90,11 @@ func startRawTestServer(t *testing.T, receivedDataChan chan<- RequestData) (stri
 func handleRawTestConnection(t *testing.T, conn net.Conn, receivedDataChan chan<- RequestData) {
 	t.Helper()
 
-	conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	// 2s instead of the original 100ms: under worker-pool bursts (especially
+	// via the CONNECT tunnel proxy, where the origin handler starts before
+	// the client has finished the handshake) first-byte gaps can exceed
+	// 100ms, silently dropping requests and flaking URI-count assertions.
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 
 	// Instead of just reading the first line, read the entire request
 	var requestBuffer strings.Builder
@@ -98,9 +103,7 @@ func handleRawTestConnection(t *testing.T, conn net.Conn, receivedDataChan chan<
 	// Read request line first (still needed to extract URI for backward compatibility)
 	requestLine, err := reader.ReadString('\n')
 	if err != nil && err != io.EOF {
-		if !strings.Contains(err.Error(), "timeout") && !strings.Contains(err.Error(), "forcibly closed") {
-			t.Logf("Test server read error: %v", err)
-		}
+		t.Logf("[origin-anomaly] first-line read failed: %v (partial line: %q)", err, requestLine)
 		return
 	}
 	requestBuffer.WriteString(requestLine)
@@ -115,17 +118,23 @@ func handleRawTestConnection(t *testing.T, conn net.Conn, receivedDataChan chan<
 		return
 	}
 
-	// Read headers until empty line
+	// Read headers until empty line, tracking Content-Length so the body read
+	// below only happens when a body actually exists.
 	emptyLineFound := false
+	contentLength := 0
 	for !emptyLineFound {
 		line, err := reader.ReadString('\n')
 		if err != nil && err != io.EOF {
-			if !strings.Contains(err.Error(), "timeout") && !strings.Contains(err.Error(), "forcibly closed") {
-				t.Logf("Test server read error when reading headers: %v", err)
-			}
+			t.Logf("[origin-anomaly] header read failed: %v (line so far: %q)", err, line)
 			break
 		}
 		requestBuffer.WriteString(line)
+
+		if lower := strings.ToLower(line); strings.HasPrefix(lower, "content-length:") {
+			if v, cerr := strconv.Atoi(strings.TrimSpace(lower[len("content-length:"):])); cerr == nil && v > 0 {
+				contentLength = v
+			}
+		}
 
 		// Empty line (just "\r\n") indicates end of headers
 		if line == "\r\n" || line == "\n" {
@@ -138,10 +147,17 @@ func handleRawTestConnection(t *testing.T, conn net.Conn, receivedDataChan chan<
 		}
 	}
 
-	bodyBuf := make([]byte, 8192*2)
-	n, _ := reader.Read(bodyBuf)
-	if n > 0 {
-		requestBuffer.Write(bodyBuf[:n])
+	// Read the body only when the request declares one: a blind Read here
+	// would block until the read deadline on every bodyless request (the
+	// original 100ms deadline masked this by accident — it doubled as a pacer,
+	// while a longer deadline makes each GET wait out the full timeout and
+	// races the client's own 3s timeout).
+	if contentLength > 0 {
+		bodyBuf := make([]byte, contentLength)
+		n, _ := io.ReadFull(reader, bodyBuf)
+		if n > 0 {
+			requestBuffer.Write(bodyBuf[:n])
+		}
 	}
 
 	// Get the full raw request
@@ -157,14 +173,13 @@ func handleRawTestConnection(t *testing.T, conn net.Conn, receivedDataChan chan<
 		HexEncoded:  hexRequest,
 	}
 
-	// Send the request data
-	select {
-	case receivedDataChan <- requestData:
-		// Successfully sent
-	case <-time.After(10 * time.Millisecond):
-		// t.Logf("Timeout sending received request data for URI '%s' - channel full?", receivedURI)
-		// Optionally, we could count these timeouts if needed for debugging without logging per instance
-	}
+	// Send the request data. The channel is buffered to numPayloads and the
+	// collector goroutine drains it continuously, so this send never blocks.
+	// The original `select + time.After(10ms)` was a latent drop-machine: if
+	// the goroutine was descheduled between timer creation and case
+	// evaluation, both cases were "ready" and select picked randomly —
+	// silently discarding records and flaking URI-count assertions.
+	receivedDataChan <- requestData
 
 	// Send a minimal valid HTTP response so the client doesn't error out
 	response := "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"

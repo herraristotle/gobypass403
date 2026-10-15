@@ -189,7 +189,11 @@ func TestPathPrefixPayloadsWithProxy(t *testing.T) {
 	//targetURL := "http://localhost/admin/config" // Target URL with multiple segments
 	targetURL := "http://localhost/admin" // Target URL with multiple segments
 	moduleName := "path_prefix"
-	proxyURL := "http://127.0.0.1:8080"
+	// In-process HTTP CONNECT tunnel proxy (see connect_proxy_test.go) — the
+	// test used to hardcode http://127.0.0.1:8080 and fail without a manually
+	// started external proxy.
+	proxyURL, stopProxy := startConnectProxy(t)
+	defer stopProxy()
 
 	t.Logf("--- Starting TestPathPrefixPayloadsWithProxy (%s) --- Proxy: %s ---", moduleName, proxyURL)
 
