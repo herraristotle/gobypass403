@@ -38,6 +38,7 @@ type CliOptions struct {
 	Expand                   bool   // -expand: derive a bounded depth-1 batch around a confirmed hit (Addendum 5 Phase B)
 	Adaptive                 bool   // -adaptive: order modules by the baseline fingerprint, escalate the deep families after a confirmed 403 plus a novel cluster (Addendum 5 Phase C)
 	Calibrate                bool   // -calibrate: send a negative-control probe and suppress clusters matching it (Addendum 6)
+	WarnWildcard             bool   // -warn-wildcard: report catch-all-shaped BYPASS clusters and point at -calibrate (Addendum 7)
 	MaxReqs                  int    // -max-reqs: hard stop after this many requests, 0 = unlimited (Addendum 5 Phase D)
 	Resume                   bool   // -resume: skip (target, module) pairs a previous run already finished (Addendum 5 Phase D)
 	TargetWorkers            int    // -tw: scan this many targets at once, one per host (Addendum 5 Phase D)

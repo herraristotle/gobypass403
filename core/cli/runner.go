@@ -162,6 +162,7 @@ func (r *Runner) Initialize() error {
 		ParsedRequest:             r.RunnerOptions.ParsedRequest,
 		Expand:                    r.RunnerOptions.Expand,
 		Adaptive:                  r.RunnerOptions.Adaptive,
+		WarnWildcard:              r.RunnerOptions.WarnWildcard,
 		MaxReqs:                   r.RunnerOptions.MaxReqs,
 		Progress:                  progress,
 		ConcurrentTargets:         r.RunnerOptions.TargetWorkers,
