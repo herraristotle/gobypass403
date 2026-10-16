@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/slicingmelon/gobypass403/core/engine/expand"
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
 	"github.com/slicingmelon/gobypass403/core/engine/scanner"
 	GB403ErrorHandler "github.com/slicingmelon/gobypass403/core/utils/error"
@@ -50,6 +51,13 @@ func (r *Runner) Initialize() error {
 	if opts.ScanProfile == "triage" {
 		GB403Logger.Info().Msgf("Scan profile: triage (%d modules after -m/-em resolution)\n",
 			len(strings.Split(opts.Module, ",")))
+	}
+
+	// Addendum 5 Phase B: expansion is opt-in, so state the budget when it is
+	// on (a default run prints nothing extra).
+	if opts.Expand {
+		GB403Logger.Info().Msgf("Expansion: enabled (%d extra requests per confirmed hit, %d per target, depth 1)\n",
+			expand.PerHit, expand.PerTarget)
 	}
 
 	// Set ResultsDBFile if not already set
@@ -119,6 +127,7 @@ func (r *Runner) Initialize() error {
 		Method:                    r.RunnerOptions.Method,
 		Body:                      r.RunnerOptions.Body,
 		ParsedRequest:             r.RunnerOptions.ParsedRequest,
+		Expand:                    r.RunnerOptions.Expand,
 
 		ReconCache: r.UrlRecon.reconService.GetReconCache(),
 	}

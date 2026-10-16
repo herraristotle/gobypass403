@@ -65,10 +65,11 @@ func (f *stringSliceFlag) Set(value string) error {
 	return nil
 }
 
-func parseFlags() (*CliOptions, error) {
-	opts := &CliOptions{}
-
-	flags := []multiFlag{
+// flagDefinitions is the flag table for one parse. Kept separate from
+// parseFlags so flag registration (and the -expand wiring) stays testable
+// without parsing os.Args.
+func flagDefinitions(opts *CliOptions) []multiFlag {
+	return []multiFlag{
 		{name: "u,url", usage: "Target URL (example: https://cms.facebook.com/login)", value: &opts.URL},
 		{name: "l,urls-file", usage: "File containing list of target URLs (one per line)", value: &opts.URLsFile},
 		{name: "shf,substitute-hosts-file", usage: "File containing a list of hosts to substitute target URL's hostname (mostly used in CDN bypasses by providing a list of CDNs)", value: &opts.SubstituteHostsFile},
@@ -109,8 +110,15 @@ func parseFlags() (*CliOptions, error) {
 		{name: "analyze-json", usage: "With -analyze: also write the report as JSON to this file (example: -analyze-json /tmp/report.json)", value: &opts.AnalyzeJSON},
 		{name: "profile", usage: "Enable pprof profiler", value: &opts.Profile, defVal: false},
 		{name: "scan-profile", usage: "Scan scope preset: full (all bypass modules) or triage (high-signal subset for first-pass triage; explicit -m wins, -em subtracts)", value: &opts.ScanProfile, defVal: "full"},
+		{name: "expand", usage: "Expand around a confirmed hit: derive a bounded depth-1 batch from the request that worked (off by default; 256 extra requests per hit, 1024 per target)", value: &opts.Expand, defVal: false},
 		{name: "update-payloads", usage: "Update payload files to latest version", value: &opts.UpdatePayloads, defVal: false},
 	}
+}
+
+func parseFlags() (*CliOptions, error) {
+	opts := &CliOptions{}
+
+	flags := flagDefinitions(opts)
 
 	// Set up custom usage
 	flag.Usage = func() {

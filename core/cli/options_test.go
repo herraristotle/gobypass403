@@ -24,13 +24,13 @@ func TestValidateMethodAcceptsValidHTTPTokens(t *testing.T) {
 
 func TestValidateMethodRejectsInvalidMethods(t *testing.T) {
 	invalid := []string{
-		"GE T",            // space
-		"PO\nST",          // LF
-		"GET\r\nX: y",     // CRLF header injection
-		"GET /admin",      // request-line smuggling attempt
-		"PO;ST",           // semicolon not a tchar
+		"GE T",        // space
+		"PO\nST",      // LF
+		"GET\r\nX: y", // CRLF header injection
+		"GET /admin",  // request-line smuggling attempt
+		"PO;ST",       // semicolon not a tchar
 		"GÉT",         // non-ASCII
-		"POST\t",          // tab
+		"POST\t",      // tab
 	}
 	for _, m := range invalid {
 		if err := validateMethod(m); err == nil {

@@ -33,6 +33,7 @@ type CliOptions struct {
 	Module                   string
 	ExcludeModule            string
 	ScanProfile              string // -scan-profile preset: full (default) | triage (Addendum 4)
+	Expand                   bool   // -expand: derive a bounded depth-1 batch around a confirmed hit (Addendum 5 Phase B)
 	MatchStatusCodesStr      string
 	MatchStatusCodes         []int
 	MatchContentType         string   // New field for multiple types
@@ -465,6 +466,9 @@ func (o *CliOptions) validateAnalyze() error {
 	}
 	if o.UpdatePayloads {
 		return fmt.Errorf("-analyze cannot be used with -update-payloads")
+	}
+	if o.Expand {
+		return fmt.Errorf("-analyze cannot be used with -expand (analysis performs no requests)")
 	}
 	return nil
 }
