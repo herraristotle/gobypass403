@@ -60,6 +60,11 @@ func (r *Runner) Initialize() error {
 			expand.PerHit, expand.PerTarget)
 	}
 
+	// Addendum 5 Phase D: a request budget is a hard stop, so say so up front.
+	if opts.MaxReqs > 0 {
+		GB403Logger.Info().Msgf("Request budget: hard stop after %d requests\n", opts.MaxReqs)
+	}
+
 	// Set ResultsDBFile if not already set
 	if r.RunnerOptions.ResultsDBFile == "" {
 		r.RunnerOptions.ResultsDBFile = filepath.Join(r.RunnerOptions.OutDir, "results.db")
@@ -128,6 +133,7 @@ func (r *Runner) Initialize() error {
 		Body:                      r.RunnerOptions.Body,
 		ParsedRequest:             r.RunnerOptions.ParsedRequest,
 		Expand:                    r.RunnerOptions.Expand,
+		MaxReqs:                   r.RunnerOptions.MaxReqs,
 
 		ReconCache: r.UrlRecon.reconService.GetReconCache(),
 	}

@@ -96,3 +96,9 @@ func (b *RequestBudget) Exhausted() bool {
 	}
 	return b.used.Load() >= b.limit
 }
+
+// reportBudgetExhausted records that the hard stop was announced, returning
+// true only the first time so a run logs it once instead of once per batch.
+func (s *Scanner) reportBudgetExhausted() bool {
+	return s.budgetAnnounced.CompareAndSwap(false, true)
+}

@@ -329,6 +329,21 @@ func (s *Scanner) scanBatch(worker *BypassEngagement, jobs []payload.BypassPaylo
 	totalJobs := len(jobs)
 	maxConcurrentReqs := s.scannerOpts.ConcurrentRequests
 
+	// -max-reqs: reserve before submitting and send only what was granted, so
+	// the total on the wire is exactly the limit. A truncated batch is a hard
+	// stop for new requests; results gathered so far are kept.
+	if s.budget != nil {
+		granted := s.budget.Reserve(totalJobs)
+		if granted < totalJobs && s.reportBudgetExhausted() {
+			GB403Logger.Warning().Msgf("Request budget reached (%d requests); stopping the scan here - results so far are kept\n", s.budget.Limit())
+		}
+		if granted == 0 {
+			return 0
+		}
+		jobs = jobs[:granted]
+		totalJobs = granted
+	}
+
 	responses := worker.requestPool.ProcessRequests(jobs)
 	var dbWg sync.WaitGroup
 	resultCount := atomic.Int32{}

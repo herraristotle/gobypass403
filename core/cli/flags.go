@@ -111,6 +111,7 @@ func flagDefinitions(opts *CliOptions) []multiFlag {
 		{name: "profile", usage: "Enable pprof profiler", value: &opts.Profile, defVal: false},
 		{name: "scan-profile", usage: "Scan scope preset: full (all bypass modules) or triage (high-signal subset for first-pass triage; explicit -m wins, -em subtracts)", value: &opts.ScanProfile, defVal: "full"},
 		{name: "expand", usage: "Expand around a confirmed hit: derive a bounded depth-1 batch from the request that worked (off by default; 256 extra requests per hit, 1024 per target)", value: &opts.Expand, defVal: false},
+		{name: "max-reqs", usage: "Hard stop after this many requests across the whole run (0 = unlimited). Counts every request sent, including expansion batches", value: &opts.MaxReqs, defVal: 0},
 		{name: "update-payloads", usage: "Update payload files to latest version", value: &opts.UpdatePayloads, defVal: false},
 	}
 }
