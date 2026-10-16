@@ -108,7 +108,7 @@ Usage:
   -shf, -substitute-hosts-file
         File containing a list of hosts to substitute target URL's hostname (mostly used in CDN bypasses by providing a list of CDNs)
   -m, -module
-        Bypass module (all,path_prefix,mid_paths,end_paths,http_methods,case_substitution,char_encode,nginx_bypasses,haproxy_bypasses,unicode_path_normalization,unicode_path_truncation,headers_scheme,headers_ip,headers_port,headers_url,headers_host,headers_hop_by_hop,api_versions). Supports glob patterns with * (e.g., headers*,*bypass*) (Default: all)
+        Bypass module (all,path_prefix,mid_paths,end_paths,http_methods,case_substitution,char_encode,nginx_bypasses,haproxy_bypasses,unicode_path_normalization,unicode_path_truncation,headers_scheme,headers_ip,headers_port,headers_url,headers_host,headers_hop_by_hop,api_versions,http10,headers_method,user_agent,param_manipulation). Supports glob patterns with * (e.g., headers*,*bypass*) (Default: all)
   -em, -exclude-module
         Exclude specific bypass modules. Supports glob patterns with * (e.g., -em unicode*,*experimental). Takes precedence over -m
   -o, -outdir
@@ -162,7 +162,7 @@ Usage:
   -fr, -follow-redirects
         Follow HTTP redirects
   -rbps, -response-body-preview-size
-        Maximum number of bytes to retrieve from response body (Default: 1024)
+        Maximum number of bytes to retrieve from response body (Default: 3096)
   -drbs, -disable-response-body-streaming
         Disables streaming of response body (default: False) (Default: false)
   -dpb, -disable-progress-bar
@@ -181,6 +181,12 @@ Usage:
         Scan scope preset: full (all bypass modules) or triage (high-signal subset for first-pass triage; explicit -m wins, -em subtracts) (Default: full)
   -expand
         Expand around a confirmed hit: derive a bounded depth-1 batch from the request that worked (off by default; 256 extra requests per hit, 1024 per target) (Default: false)
+  -max-reqs
+        Hard stop after this many requests across the whole run (0 = unlimited). Counts every request sent, including expansion batches (Default: 0)
+  -resume
+        Continue an interrupted run: skip the (target, module) pairs scan.progress.json in the output dir already marks complete (Default: false)
+  -tw
+        Scan this many targets at once, at most one per host (1 = sequential, the default). Disables the progress bar and prints each target's table as it finishes (Default: 1)
   -update-payloads
         Update payload files to latest version (Default: false)
 ```
@@ -266,6 +272,87 @@ Guardrails:
 exploitable". Matching is exact-digest only (no fuzzy matching), expansion is
 one round deep, and many modules have no mutator at all (most header families,
 `param_manipulation`, `user_agent`, …), so they expand nothing.
+
+## Long runs: request budget, resume and parallel targets
+
+Three flags make a long scan cheaper to run and cheaper to repeat. All three are
+opt-in: without them a run is byte-identical to what it always was.
+
+### `-max-reqs <n>` — stop after a fixed number of requests
+
+```bash
+# at most 2000 requests in total, then report what was found so far
+gobypass403 -l targets.txt -max-reqs 2000
+```
+
+The budget is **shared by everything** the run sends — every module, every
+target, expansion batches included — and `0` (the default) means unlimited.
+
+**Exhaustion semantics.** Running out does *not* abort the scan. Later batches
+reserve nothing and send nothing, the run finishes normally, and the findings
+already collected are kept. You get **one** warning line saying the budget is
+gone. A retried request is not charged twice, so with `-max-retry` above 0 the
+wire may see slightly more than `n` attempts; the budget counts *requests
+issued*, not retries of them.
+
+### `-resume` — continue an interrupted run
+
+```bash
+# same outdir, same command, after a ctrl-c
+gobypass403 -u https://target.example/admin -o /tmp/scan -resume
+```
+
+`-resume` reads `scan.progress.json` from the output directory, skips every
+`(target, module)` pair already recorded there, and records each pair as soon as
+its module finishes — so an interruption costs at most the module that was
+running, never the whole run. Findings are not duplicated: skipped pairs send no
+requests and store no rows.
+
+```json
+{
+  "version": 1,
+  "completed": [
+    { "target_url": "https://target.example/admin", "module": "dumb_check" }
+  ]
+}
+```
+
+- **Without `-resume` there is no sidecar at all** — no file is read and none is
+  written, which is why a plain run's output does not change.
+- A **damaged or foreign** `scan.progress.json` is reported and ignored: the run
+  rescans everything instead of failing.
+- **Use `-o` with it.** The default output directory is unique per run
+  (`/tmp/gobypass403_tmp/gobypass403_<id>/`), so `-resume` without `-o` finds no
+  checkpoint and starts over — the `Resume: 0 completed (target, module) pairs
+  will be skipped` line is your signal.
+- **Honest limits.** A pair is keyed by the target string as you typed it and by
+  **module name**: a target spelled differently is a different pair, and a module
+  whose payload set changed since the interruption is still considered done.
+  `-resume` cannot be combined with `-analyze`.
+
+### `-tw <n>` — several targets at once
+
+```bash
+# four targets in flight, but never two at the same host
+gobypass403 -l targets.txt -tw 4 -max-reqs 5000
+```
+
+`-tw` (default `1`, i.e. today's sequential loop) scans up to `n` targets
+concurrently with **one target per host at a time**: work is distributed as one
+bucket of targets per host, so a worker owns a host until its targets are done.
+That is the politeness rule — `-tw` never lets the tool hit one host with two
+different targets simultaneously, whatever `-cr` says within a target.
+
+- With `-tw > 1` the **progress bar is disabled** (one warning line) because a
+  single bar cannot describe several targets, and each target's table is printed
+  **as that target finishes** — completion order, not input order.
+- Result tables never interleave: each target still gets its own table and
+  summary line.
+- The request budget (`-max-reqs`) is shared across workers, so the total stays
+  exact however many run at once, and the findings DB keeps its single-writer
+  discipline, so per-target row counts are exactly those of the sequential runs.
+- `-tw 1` keeps the sequential loop and input-order output, byte for byte.
+- Invalid values (`0`, negative) are rejected.
 
 ## Standard WAF 403/401 Bypass
 
