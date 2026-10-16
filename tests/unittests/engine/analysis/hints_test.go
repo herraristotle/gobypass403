@@ -73,6 +73,26 @@ func TestWildcardHintIgnoresFewDistinctRequests(t *testing.T) {
 	}
 }
 
+// TestWildcardHintFiresAtTheThreshold pins the boundary itself. The rule's
+// documented minimum is five distinct requests; without this case a mutation
+// that shifted the comparison by one (firing only from six) would pass every
+// other test, because they only ever use four or six. Four is covered as
+// silent above, six as firing below.
+func TestWildcardHintFiresAtTheThreshold(t *testing.T) {
+	const threshold = 5
+	rows := append([]analysis.Row{
+		row("dumb_check", 403, len(forbidden), forbidden, "curl dumb"),
+	}, wildcardRows("end_paths", threshold)...)
+
+	hints := analysis.WildcardHints(analysis.ClassifyReport(rows))
+	if len(hints) != 1 {
+		t.Fatalf("want 1 hint at exactly %d distinct requests, got %d (%+v)", threshold, len(hints), hints)
+	}
+	if hints[0].Requests != threshold {
+		t.Errorf("Requests = %d, want %d", hints[0].Requests, threshold)
+	}
+}
+
 func TestWildcardHintCountsDistinctRequestsNotMembers(t *testing.T) {
 	// Six members, but only two distinct request lines: not a catch-all.
 	rows := append([]analysis.Row{
