@@ -680,8 +680,14 @@ func (o *CliOptions) validateModule() error {
 	return nil
 }
 
-// setupOutputDir creates the output directory
+// setupOutputDir creates the output directory. A pre-existing *file* at the
+// path is reported as such: MkdirAll's raw "not a directory" syscall error
+// reads as an internal failure and never names the real cause (the operator
+// pointed -o at a file, not a directory).
 func (o *CliOptions) setupOutputDir() error {
+	if info, err := os.Stat(o.OutDir); err == nil && !info.IsDir() {
+		return fmt.Errorf("output path %q exists and is not a directory", o.OutDir)
+	}
 	if err := os.MkdirAll(o.OutDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
