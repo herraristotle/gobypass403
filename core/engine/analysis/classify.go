@@ -312,11 +312,22 @@ func classifyRows(rows []obsRow) (clusters []clusterCore, baselineSource string,
 }
 
 // statusImproves reports whether status crosses from a denial class
-// (4xx/5xx) into a success or redirect class (2xx/3xx) relative to the
-// baseline. Going 403 -> 404 is not an improvement (both are denials).
+// (4xx/5xx) into a success class (2xx) relative to the baseline. Going
+// 403 -> 404 is not an improvement (both are denials).
+//
+// Redirects (3xx) are deliberately NOT an improvement. A redirect is not
+// proof of access: the canonical false positive is a scheme redirect
+// (http://<origin>/.env -> 301 https://host/.env -> 403), which improves
+// 403 to 301 while still serving nothing (observed live on billpoint.co).
+// Such a response stays visible as a VARIANT with its curl PoC, so the
+// operator can follow it by hand, but it is never auto-promoted to BYPASS.
+// This matches the spec's written contract -- "status class improved vs
+// baseline (e.g. baseline 403 -> 2xx)" -- and drops unKover's 3xx-as-success
+// rule, which unKover only got away with because it also runs a wildcard
+// negative control (deferred here).
 func statusImproves(status, baselineStatus int) bool {
 	c := status / 100
-	return (c == 2 || c == 3) && c < baselineStatus/100
+	return c == 2 && c < baselineStatus/100
 }
 
 // modalStatus returns the most frequent status code, ties broken by the
