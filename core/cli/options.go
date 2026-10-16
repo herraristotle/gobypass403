@@ -34,6 +34,7 @@ type CliOptions struct {
 	ExcludeModule            string
 	ScanProfile              string // -scan-profile preset: full (default) | triage (Addendum 4)
 	Expand                   bool   // -expand: derive a bounded depth-1 batch around a confirmed hit (Addendum 5 Phase B)
+	Adaptive                 bool   // -adaptive: order modules by the baseline fingerprint, escalate the deep families after a confirmed 403 plus a novel cluster (Addendum 5 Phase C)
 	MaxReqs                  int    // -max-reqs: hard stop after this many requests, 0 = unlimited (Addendum 5 Phase D)
 	Resume                   bool   // -resume: skip (target, module) pairs a previous run already finished (Addendum 5 Phase D)
 	TargetWorkers            int    // -tw: scan this many targets at once, one per host (Addendum 5 Phase D)
@@ -498,6 +499,9 @@ func (o *CliOptions) validateAnalyze() error {
 	}
 	if o.Expand {
 		return fmt.Errorf("-analyze cannot be used with -expand (analysis performs no requests)")
+	}
+	if o.Adaptive {
+		return fmt.Errorf("-analyze cannot be used with -adaptive (analysis performs no requests)")
 	}
 	if o.MaxReqs > 0 {
 		return fmt.Errorf("-analyze cannot be used with -max-reqs (analysis performs no requests)")

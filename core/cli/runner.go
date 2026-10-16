@@ -60,6 +60,12 @@ func (r *Runner) Initialize() error {
 			expand.PerHit, expand.PerTarget)
 	}
 
+	// Addendum 5 Phase C: adaptive ordering is opt-in too, and its escalation
+	// is the expensive part, so state the rule it follows.
+	if opts.Adaptive {
+		GB403Logger.Info().Msgf("Adaptive: module order from the baseline fingerprint; deep families only after a 403 baseline plus a novel cluster\n")
+	}
+
 	// Addendum 5 Phase D: a request budget is a hard stop, so say so up front.
 	if opts.MaxReqs > 0 {
 		GB403Logger.Info().Msgf("Request budget: hard stop after %d requests\n", opts.MaxReqs)
@@ -155,6 +161,7 @@ func (r *Runner) Initialize() error {
 		Body:                      r.RunnerOptions.Body,
 		ParsedRequest:             r.RunnerOptions.ParsedRequest,
 		Expand:                    r.RunnerOptions.Expand,
+		Adaptive:                  r.RunnerOptions.Adaptive,
 		MaxReqs:                   r.RunnerOptions.MaxReqs,
 		Progress:                  progress,
 		ConcurrentTargets:         r.RunnerOptions.TargetWorkers,

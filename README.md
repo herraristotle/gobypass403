@@ -179,6 +179,8 @@ Usage:
         Enable pprof profiler (Default: false)
   -scan-profile
         Scan scope preset: full (all bypass modules) or triage (high-signal subset for first-pass triage; explicit -m wins, -em subtracts) (Default: full)
+  -adaptive
+        Order the modules by the baseline fingerprint and run the deep families once a confirmed 403 produced a novel cluster (off by default; the fingerprint costs no extra request) (Default: false)
   -expand
         Expand around a confirmed hit: derive a bounded depth-1 batch from the request that worked (off by default; 256 extra requests per hit, 1024 per target) (Default: false)
   -max-reqs

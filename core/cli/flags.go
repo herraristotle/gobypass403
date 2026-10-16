@@ -110,6 +110,7 @@ func flagDefinitions(opts *CliOptions) []multiFlag {
 		{name: "analyze-json", usage: "With -analyze: also write the report as JSON to this file (example: -analyze-json /tmp/report.json)", value: &opts.AnalyzeJSON},
 		{name: "profile", usage: "Enable pprof profiler", value: &opts.Profile, defVal: false},
 		{name: "scan-profile", usage: "Scan scope preset: full (all bypass modules) or triage (high-signal subset for first-pass triage; explicit -m wins, -em subtracts)", value: &opts.ScanProfile, defVal: "full"},
+		{name: "adaptive", usage: "Order the modules by the baseline fingerprint and run the deep families once a confirmed 403 produced a novel cluster (off by default; the fingerprint costs no extra request)", value: &opts.Adaptive, defVal: false},
 		{name: "expand", usage: "Expand around a confirmed hit: derive a bounded depth-1 batch from the request that worked (off by default; 256 extra requests per hit, 1024 per target)", value: &opts.Expand, defVal: false},
 		{name: "max-reqs", usage: "Hard stop after this many requests across the whole run (0 = unlimited). Counts every request sent, including expansion batches", value: &opts.MaxReqs, defVal: 0},
 		{name: "resume", usage: "Continue an interrupted run: skip the (target, module) pairs scan.progress.json in the output dir already marks complete", value: &opts.Resume, defVal: false},
