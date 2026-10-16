@@ -46,6 +46,40 @@ func Analyze(dbPath string) (Report, error) {
 	}
 	defer rows.Close()
 
+	all, err := scanRows(rows, dbPath)
+	if err != nil {
+		return Report{}, err
+	}
+
+	return ClassifyReport(all), nil
+}
+
+// TargetRows reads the analyzer projection for one target_url. The live scan
+// uses it once a target has finished, so the wildcard hint (Addendum 7) is
+// computed from exactly the rows -analyze sees, with the same classifier.
+func TargetRows(dbPath, targetURL string) ([]Row, error) {
+	if _, err := os.Stat(dbPath); err != nil {
+		return nil, fmt.Errorf("cannot read findings database %q: %w", dbPath, err)
+	}
+
+	db, err := sql.Open("sqlite3", readOnlyDSN(dbPath))
+	if err != nil {
+		return nil, fmt.Errorf("open findings database %q: %w", dbPath, err)
+	}
+	defer db.Close()
+
+	rows, err := db.Query(selectRowsSQL+" WHERE target_url = ?", targetURL)
+	if err != nil {
+		return nil, fmt.Errorf("read %q (is it a gobypass403 results.db?): %w", dbPath, err)
+	}
+	defer rows.Close()
+
+	return scanRows(rows, dbPath)
+}
+
+// scanRows materialises the analyzer projection. Only the selected columns are
+// read, so a reduced-column fixture stays a faithful input.
+func scanRows(rows *sql.Rows, dbPath string) ([]Row, error) {
 	var all []Row
 	for rows.Next() {
 		var (
@@ -58,7 +92,7 @@ func Analyze(dbPath string) (Report, error) {
 			&targetURL, &module, &status, &contentLength, &contentType,
 			&preview, &bodyBytes, &curl,
 		); err != nil {
-			return Report{}, fmt.Errorf("scan row of %q: %w", dbPath, err)
+			return nil, fmt.Errorf("scan row of %q: %w", dbPath, err)
 		}
 		all = append(all, Row{
 			TargetURL:           targetURL,
@@ -72,10 +106,10 @@ func Analyze(dbPath string) (Report, error) {
 		})
 	}
 	if err := rows.Err(); err != nil {
-		return Report{}, fmt.Errorf("iterate %q: %w", dbPath, err)
+		return nil, fmt.Errorf("iterate %q: %w", dbPath, err)
 	}
 
-	return ClassifyReport(all), nil
+	return all, nil
 }
 
 // readOnlyDSN opens the database read-only. journal-mode pragmas are

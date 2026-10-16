@@ -138,6 +138,14 @@ func (s *Scanner) reportTarget(url string, totalFindings int) {
 	// Print summary for this URL
 	GB403Logger.Success().Msgf("Found %d results for %s", totalFindings, url)
 	fmt.Println()
+
+	// Addendum 7: with -warn-wildcard, name catch-all-shaped clusters. Printed
+	// after the summary and read-only, so a run without the flag is unchanged.
+	if s.scannerOpts.WarnWildcard {
+		if err := PrintWildcardHints(url); err != nil {
+			GB403Logger.Warning().Msgf("wildcard hint unavailable: %v", err)
+		}
+	}
 }
 
 // runTargetPool scans the targets concurrently (Addendum 5 Phase D, -tw). Work
