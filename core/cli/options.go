@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/slicingmelon/gobypass403/core/engine/adaptive"
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
 	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
 	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
@@ -138,32 +139,28 @@ var AvailableModules = map[string]bool{
 }
 
 // profileTriageModules is the -scan-profile triage preset
-// (SPEC-unkover-gaps.md Addendum 4): every BypassModulesRegistry module
-// except the deep families (path_prefix, unicode_path_*, param_manipulation),
-// listed in registry order. Triage covers every technique the unKover
-// testbed exercises (headers_ip, end_paths suffix, http_methods case,
-// char_encode url-encoding, http10, api_versions, hop-by-hop) plus the
-// full header-matrix depth — minutes per target instead of a full -m all
+// (SPEC-unkover-gaps.md Addendum 4): every BypassModulesRegistry module except
+// the deep families, in registry order. Triage covers every technique the
+// unKover testbed exercises (headers_ip, end_paths suffix, http_methods case,
+// char_encode url-encoding, http10, api_versions, hop-by-hop) plus the full
+// header-matrix depth — minutes per target instead of a full -m all
 // enumeration (68,819 payloads with scheme expansion).
-var profileTriageModules = []string{
-	"dumb_check",
-	"mid_paths",
-	"end_paths",
-	"http_methods",
-	"case_substitution",
-	"char_encode",
-	"nginx_bypasses",
-	"haproxy_bypasses",
-	"headers_scheme",
-	"headers_ip",
-	"headers_port",
-	"headers_url",
-	"headers_host",
-	"headers_hop_by_hop",
-	"api_versions",
-	"http10",
-	"headers_method",
-	"user_agent",
+//
+// The list is derived from adaptive.DeepModules() rather than hand-kept
+// (Addendum 5 Phase C): the deep families escalation adds are exactly the ones
+// triage leaves out, and deriving one from the other keeps them from drifting.
+var profileTriageModules = triageModules()
+
+// triageModules is the registry minus the deep families, in registry order.
+func triageModules() []string {
+	deep := adaptive.DeepModules()
+	out := make([]string, 0, len(payload.BypassModulesRegistry))
+	for _, module := range payload.BypassModulesRegistry {
+		if !slices.Contains(deep, module) {
+			out = append(out, module)
+		}
+	}
+	return out
 }
 
 // matchGlob performs simple glob pattern matching
