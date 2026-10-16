@@ -96,6 +96,10 @@ type Request struct {
 	Module  string
 	Payload payload.BypassPayload // the request that worked
 	Sent    []string              // RawURIs already requested for this module
+	// SentShapes are full request shapes (ShapeKey) already requested in this
+	// batch. Method and header twins of one RawURI would otherwise re-derive a
+	// shape the module tested itself, so those are skipped too.
+	SentShapes []string
 }
 
 // Mutate returns the derived requests for a confirmed hit: deterministic
@@ -121,7 +125,11 @@ func Mutate(req Request, composer Composer, budget int) []payload.BypassPayload 
 	// Full request shapes already produced. The key covers method,
 	// request-target and headers, so method/header twins of one RawURI do not
 	// shadow each other, and the confirmed request is excluded.
-	seen := map[string]bool{requestKey(req.Payload): true}
+	seen := make(map[string]bool, len(req.SentShapes)+1)
+	for _, k := range req.SentShapes {
+		seen[k] = true
+	}
+	seen[requestKey(req.Payload)] = true
 	out := make([]payload.BypassPayload, 0, budget)
 
 	// add appends p unless its full request shape was already produced.
@@ -213,6 +221,14 @@ func Decide(module string, report analysis.TargetReport, refs []payload.BypassPa
 		return refs[c.RepresentativeRef], true
 	}
 	return payload.BypassPayload{}, false
+}
+
+// ShapeKey identifies a full request shape for dedupe purposes: the
+// path-family variants differ in RawURI, the method family in Method, and the
+// header family in a header value. Callers use it to tell Mutate which shapes
+// are already on the wire.
+func ShapeKey(p payload.BypassPayload) string {
+	return requestKey(p)
 }
 
 // requestKey identifies a full request shape for dedupe purposes: the

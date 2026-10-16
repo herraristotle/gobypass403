@@ -120,11 +120,18 @@ func (e *expandState) decide(module, targetURL string, composer expand.Composer)
 	}
 
 	sent := make([]string, 0, len(e.batchReqs))
+	shapes := make([]string, 0, len(e.batchReqs))
 	for _, p := range e.batchReqs {
 		sent = append(sent, p.RawURI)
+		shapes = append(shapes, expand.ShapeKey(p))
 	}
 
-	derived := expand.Mutate(expand.Request{Module: module, Payload: hit, Sent: sent}, composer, e.budget)
+	derived := expand.Mutate(expand.Request{
+		Module:     module,
+		Payload:    hit,
+		Sent:       sent,
+		SentShapes: shapes,
+	}, composer, e.budget)
 	e.budget -= len(derived)
 	return derived
 }

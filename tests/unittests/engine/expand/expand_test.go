@@ -178,6 +178,38 @@ func methodsEqualFold(a, b string) bool {
 	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
+// The module often tests its own case variants (http_methods sends both
+// `acl` and `ACL`), so a plain twin can name a shape that is already on the
+// wire. Re-sending it costs a request and proves nothing, so Mutate must skip
+// shapes the batch already sent.
+func TestMutateSkipsShapesTheBatchAlreadySent(t *testing.T) {
+	hit := payloadFor("/access")
+	hit.Method = "ACL"
+	hit.BypassModule = expand.ModuleHTTPMethods
+
+	alreadySent := hit
+	alreadySent.Method = "acl"
+
+	got := expand.Mutate(expand.Request{
+		Module:     expand.ModuleHTTPMethods,
+		Payload:    hit,
+		Sent:       []string{hit.RawURI},
+		SentShapes: []string{expand.ShapeKey(alreadySent)},
+	}, nil, expand.PerHit)
+
+	if len(got) == 0 {
+		t.Fatal("expected derived requests for the method family")
+	}
+	for _, g := range got {
+		if g.Method == "acl" {
+			t.Errorf("re-derived %q, a shape the batch already sent", g.Method)
+		}
+		if g.Method == hit.Method {
+			t.Errorf("re-derived the confirmed method %q", hit.Method)
+		}
+	}
+}
+
 func TestMutateHeaderIPFamilyNotationsAndNeighbours(t *testing.T) {
 	hit := payloadFor("/access")
 	hit.BypassModule = expand.ModuleHeadersIP
