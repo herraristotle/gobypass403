@@ -183,6 +183,8 @@ Usage:
         Order the modules by the baseline fingerprint and run the deep families once a confirmed 403 produced a novel cluster (off by default; the fingerprint costs no extra request) (Default: false)
   -calibrate
         Send a negative-control probe to a path that cannot exist and suppress any result matching it (kills wildcard/soft-404 false positives; off by default, costs 3 requests per target) (Default: false)
+  -warn-wildcard
+        With -calibrate off: report a BYPASS cluster whose many distinct requests share one response as wildcard-shaped and point at -calibrate (a hint only, it never suppresses or reclassifies anything; works with -analyze; off by default) (Default: false)
   -expand
         Expand around a confirmed hit: derive a bounded depth-1 batch from the request that worked (off by default; 256 extra requests per hit, 1024 per target) (Default: false)
   -max-reqs
@@ -264,6 +266,33 @@ escalated.
 - **Honest limits.** Matching relies on the stored length: with a small `-rbps`
   two distinct large bodies can both read as the preview cap and match. The
   digest-equal path is exact; when in doubt, read the `curl` PoC in the report.
+
+### Spotting a wildcard when you forgot `-calibrate`: `-warn-wildcard`
+
+`-calibrate` is the fix; `-warn-wildcard` is the nudge that tells you it was
+needed. With it on, the end of a live run (and the offline `-analyze` report)
+adds one line per suspect cluster:
+
+```
+wildcard-shaped cluster: 6 requests returned the same 200 text/html 39B (http_methods)
+```
+
+It fires when a `BYPASS` cluster's members come from **many distinct requests**
+(≥ 5) while sharing one response shape — the signature of a server that answers
+every path the same way. It is a **hint only**: it never suppresses,
+reclassifies, hides or rewrites a finding. It says "looks like", and it points
+you at `-calibrate` to settle it. Runs that already used `-calibrate` are
+skipped entirely — the control already answered the question — and the flag
+appears in `-analyze` too, so you can re-read an old `results.db`. Without the
+flag, output is byte-identical to today.
+
+- **Needs the baseline row.** The hint reads the run's baseline (the
+  `dumb_check` row). A run whose `-mc` filter drops the baseline `403` stores
+  the wildcard `200` as the modal baseline instead, the cluster classifies as a
+  duplicate, and the hint stays silent. On a target you suspect of a catch-all,
+  widen `-mc` (or just use `-calibrate`).
+- **Not in `-analyze-json`.** The hint is operator-facing text; the JSON report
+  is unchanged.
 
 ## Feedback Expansion: expand around a confirmed hit
 
