@@ -18,6 +18,7 @@ package tests
 // expand_wire_test.go and friends live with).
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -123,5 +124,51 @@ func TestWildcardHintSilentOnADenyingBoard(t *testing.T) {
 	}
 	if len(hints) != 0 {
 		t.Errorf("a denying board must not hint; got %+v", hints)
+	}
+}
+
+// TestWildcardHintAgreesWithTheOfflineReport pins the property the whole design
+// rests on: the live hint and -analyze read the same rows and run the same
+// classifier, so they cannot tell an operator two different stories about one
+// database.
+func TestWildcardHintAgreesWithTheOfflineReport(t *testing.T) {
+	initWireDB(t)
+
+	board := startWireBoard(t, soft404Accept)
+	target := board.url("/access")
+
+	s := scanner.NewScanner(wildcardOpts(false), []string{target})
+	s.RunAllBypasses(target)
+
+	live, err := scanner.WildcardHintsForTarget(target)
+	if err != nil {
+		t.Fatalf("WildcardHintsForTarget: %v", err)
+	}
+	if len(live) == 0 {
+		t.Fatal("fixture must produce a hint to compare")
+	}
+
+	report, err := analysis.Analyze(filepath.Join(wireDBDir, "results.db"))
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+
+	// The shared DB holds other tests' targets too: compare this target only.
+	var offline []analysis.Hint
+	for _, h := range analysis.WildcardHints(report) {
+		if h.TargetURL == target {
+			offline = append(offline, h)
+		}
+	}
+
+	if len(offline) != len(live) {
+		t.Fatalf("live hints %d, offline hints %d (%+v vs %+v)", len(live), len(offline), live, offline)
+	}
+	for i := range live {
+		if live[i].Fingerprint != offline[i].Fingerprint ||
+			live[i].Requests != offline[i].Requests ||
+			live[i].Module != offline[i].Module {
+			t.Errorf("live hint %+v differs from offline hint %+v", live[i], offline[i])
+		}
 	}
 }

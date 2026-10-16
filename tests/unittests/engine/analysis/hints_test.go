@@ -190,3 +190,56 @@ func mustJSON(t *testing.T, rep analysis.Report) string {
 	}
 	return string(data)
 }
+
+// TestWildcardHintSilentForACalibratedDatabase goes through the database: a run
+// whose control rows are present has already answered the wildcard question, so
+// the offline analyzer must stay quiet on the very same catch-all shape.
+func TestWildcardHintSilentForACalibratedDatabase(t *testing.T) {
+	db, path := newFixtureDB(t)
+	rows := []analysis.Row{
+		row("dumb_check", 403, len(forbidden), forbidden, "curl dumb"),
+		// A control the catch-all does not match (different media type), so the
+		// catch-all stays a BYPASS and only the control rule can silence it.
+		mediaRow(analysis.CalibrationModule, 200, 4, "text/plain", "nope", "curl cal"),
+	}
+	rows = append(rows, wildcardRows("end_paths", 6)...)
+	insertRows(t, db, rows...)
+	_ = db.Close()
+
+	rep := mustAnalyze(t, path)
+	if rep.Targets[0].CalibrationControls != 1 {
+		t.Fatalf("fixture must carry 1 control row, got %d", rep.Targets[0].CalibrationControls)
+	}
+	if len(clustersOfClass(rep.Targets[0], analysis.ClassBypass)) != 1 {
+		t.Fatalf("fixture must leave one BYPASS cluster; got %+v", rep.Targets[0].Clusters)
+	}
+	if hints := analysis.WildcardHints(rep); len(hints) != 0 {
+		t.Fatalf("a calibrated database must not hint; got %d (%+v)", len(hints), hints)
+	}
+}
+
+// TestWildcardHintIgnoresTheRealMarkerShape rebuilds the 2026-10-16 testbed
+// reading: four distinct requests returning the board's "Parser confusion
+// bypass -- resource loaded." marker next to a genuine catch-all. Only the
+// catch-all is hinted; a finding served for a handful of requests is not.
+func TestWildcardHintIgnoresTheRealMarkerShape(t *testing.T) {
+	const marker = "Parser confusion bypass - resource loaded."
+
+	db, path := newFixtureDB(t)
+	rows := []analysis.Row{row("dumb_check", 403, len(forbidden), forbidden, "curl dumb")}
+	for i := 0; i < 4; i++ {
+		rows = append(rows, row("end_paths", 200, len(marker), marker,
+			fmt.Sprintf("curl -skgi --path-as-is 'https://t.example/access/profile;.json%d'", i)))
+	}
+	rows = append(rows, wildcardRows("end_paths", 6)...)
+	insertRows(t, db, rows...)
+	_ = db.Close()
+
+	hints := analysis.WildcardHints(mustAnalyze(t, path))
+	if len(hints) != 1 {
+		t.Fatalf("want exactly 1 hint (the catch-all), got %d (%+v)", len(hints), hints)
+	}
+	if hints[0].Fingerprint.Length != int64(len(catchAll)) || hints[0].Requests != 6 {
+		t.Errorf("hint = %+v, want the six-request catch-all, not the four markers", hints[0])
+	}
+}
