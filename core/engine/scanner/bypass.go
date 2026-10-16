@@ -531,7 +531,9 @@ func (s *Scanner) scanBatch(worker *BypassEngagement, jobs []payload.BypassPaylo
 			defer dbWg.Done()
 			if err := AppendResultsToDB([]*Result{res}); err != nil {
 				GB403Logger.Error().Msgf("Failed to write result to DB: %v\n\n", err)
-			} else {
+			} else if !isControl {
+				// A control row is stored for -analyze but is not a finding,
+				// so it must not inflate `Found N results` (Addendum 6).
 				resultCount.Add(1)
 			}
 		}(result)

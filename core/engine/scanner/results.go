@@ -17,6 +17,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pterm/pterm"
 	"github.com/slicingmelon/go-bytesutil/bytesutil"
+	"github.com/slicingmelon/gobypass403/core/engine/analysis"
 )
 
 // to optimize
@@ -128,6 +129,21 @@ func getTableHeader() []string {
 	}
 }
 
+// printableModules is the module filter of the printed results table with the
+// negative-control module removed (Addendum 6): control rows are stored for the
+// offline analyzer but are not findings, so they are not printed. An empty
+// result means the run only had controls, which prints nothing.
+func printableModules(bypassModule string) []string {
+	modules := strings.Split(bypassModule, ",")
+	out := make([]string, 0, len(modules))
+	for _, module := range modules {
+		if module != analysis.CalibrationModule {
+			out = append(out, module)
+		}
+	}
+	return out
+}
+
 func PrintResultsTableFromDB(targetURL, bypassModule string) error {
 	// Extract dbPath from existing connection
 	roDb, err := sql.Open("sqlite3", "file:"+dbPath+"?_journal_mode=WAL&_synchronous=NORMAL&_busy_timeout=10000&cache=shared&mode=ro")
@@ -140,7 +156,10 @@ func PrintResultsTableFromDB(targetURL, bypassModule string) error {
 	roDb.SetMaxOpenConns(10)
 	roDb.SetMaxIdleConns(5)
 
-	queryModules := strings.Split(bypassModule, ",")
+	queryModules := printableModules(bypassModule)
+	if len(queryModules) == 0 {
+		return nil
+	}
 	placeholders := strings.Repeat("?,", len(queryModules))
 	placeholders = placeholders[:len(placeholders)-1] // Remove trailing comma
 
