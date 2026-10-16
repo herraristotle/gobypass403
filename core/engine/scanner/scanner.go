@@ -61,7 +61,6 @@ type Scanner struct {
 	scannerOpts        *ScannerOpts
 	urls               []string
 	progressBarEnabled atomic.Bool
-	expand             expandState
 	budget             *RequestBudget
 	budgetAnnounced    atomic.Bool
 }
@@ -73,7 +72,6 @@ func NewScanner(opts *ScannerOpts, urls []string) *Scanner {
 		urls:        urls,
 	}
 	s.progressBarEnabled.Store(!opts.DisableProgressBar)
-	s.expand = newExpandState(opts.Expand)
 	if opts.MaxReqs > 0 {
 		s.budget = NewRequestBudget(opts.MaxReqs)
 	}

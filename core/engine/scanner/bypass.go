@@ -23,69 +23,6 @@ import (
 	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
 )
 
-// Global map to track already seen RawURIs across all bypass modules
-var (
-	seenRawURIsMutex sync.RWMutex
-	seenRawURIs      = make(map[string]string) // map[rawURI]bypassModule
-)
-
-// FilterUniqueBypassPayloads removes payloads with RawURIs that have been seen before across modules
-func FilterUniqueBypassPayloads(payloads []payload.BypassPayload, bypassModule string) []payload.BypassPayload {
-	// Check if this module should be filtered
-	modulesToFilter := map[string]bool{
-		"case_substitution":          true,
-		"char_encode":                true,
-		"end_paths":                  true,
-		"mid_paths":                  true,
-		"nginx_bypasses":             true,
-		"path_prefix":                true,
-		"unicode_path_normalization": true,
-		"unicode_path_truncation":    true,
-		"unicode_path_experimental":  true,
-	}
-
-	if !modulesToFilter[bypassModule] {
-		return payloads
-	}
-
-	filtered := make([]payload.BypassPayload, 0, len(payloads))
-
-	seenRawURIsMutex.RLock()
-	initialSize := len(seenRawURIs)
-	seenRawURIsMutex.RUnlock()
-
-	for _, p := range payloads {
-		seenRawURIsMutex.RLock()
-		previousModule, seen := seenRawURIs[p.RawURI]
-		seenRawURIsMutex.RUnlock()
-
-		// Add payloads that are globally unique or belong to this module
-		if !seen || previousModule == bypassModule {
-			// Add to filtered list
-			filtered = append(filtered, p)
-
-			// Update global map
-			if !seen {
-				seenRawURIsMutex.Lock()
-				seenRawURIs[p.RawURI] = bypassModule
-				seenRawURIsMutex.Unlock()
-			}
-		}
-	}
-
-	seenRawURIsMutex.RLock()
-	newSize := len(seenRawURIs)
-	seenRawURIsMutex.RUnlock()
-
-	// Calculate new unique RawURIs added
-	addedURIs := newSize - initialSize
-
-	GB403Logger.Verbose().Msgf("[%s] Filtered payloads: %d -> %d | Global RawURIs: %d -> %d (%d new unique)",
-		bypassModule, len(payloads), len(filtered), initialSize, newSize, addedURIs)
-
-	return filtered
-}
-
 // IsValidBypassModule checks if a module is valid
 func IsValidBypassModule(moduleName string) bool {
 	return slices.Contains(payload.BypassModulesRegistry, moduleName)
@@ -158,23 +95,14 @@ func (w *BypassEngagement) Stop() {
 	})
 }
 
-// ResetSeenRawURIs clears the global map of seen RawURIs
-func ResetSeenRawURIs() {
-	seenRawURIsMutex.Lock()
-	defer seenRawURIsMutex.Unlock()
-
-	// Create a new map rather than clearing the existing one
-	// This is more efficient for large maps
-	seenRawURIs = make(map[string]string)
-	GB403Logger.Verbose().Msgf("Reset global RawURI tracking map\n")
-}
-
 // RunAllBypasses runs all bypass modules for a target URL
 func (s *Scanner) RunAllBypasses(targetURL string) int {
 	totalFindings := 0
 
-	// Reset the global seen RawURIs map for this new target URL
-	ResetSeenRawURIs()
+	// One state per target run (Addendum 5 Phase D): the seen-RawURI history
+	// and the expansion bookkeeping belong to this target, not to the scanner,
+	// so another target can be scanned at the same time.
+	ts := newTargetState(s.scannerOpts.Expand)
 
 	// Addendum 5 Phase D: with -resume the checkpoint names the (target,
 	// module) pairs that already finished, and each pair is made durable as
@@ -194,7 +122,7 @@ func (s *Scanner) RunAllBypasses(targetURL string) int {
 			continue
 		}
 
-		findings := s.RunBypassModule(module, targetURL)
+		findings := s.runBypassModule(module, targetURL, ts)
 		totalFindings += findings
 
 		progress.Mark(targetURL, module)
@@ -223,8 +151,16 @@ func effectiveTargetURL(targetURL string, pr *rawhttp.ParsedRequest) string {
 	return parsed.Scheme + "://" + host + pr.RawURI
 }
 
-// RunBypassModule runs a specific bypass module and returns the number of findings
+// RunBypassModule runs a specific bypass module and returns the number of
+// findings. The module gets a fresh target state: a one-off call is a target of
+// its own, so it must not inherit or leave behind another target's history.
 func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
+	return s.runBypassModule(bypassModule, targetURL, newTargetState(s.scannerOpts.Expand))
+}
+
+// runBypassModule is RunBypassModule over a caller-owned target state, which is
+// how RunAllBypasses shares one history across the modules of a single target.
+func (s *Scanner) runBypassModule(bypassModule string, targetURL string, ts *targetState) int {
 	if !IsValidBypassModule(bypassModule) {
 		GB403Logger.Error().Msgf("Invalid bypass module: %s\n", bypassModule)
 		return 0
@@ -270,7 +206,7 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 	}
 
 	// Filter unique payloads based on RawURI
-	allJobs = FilterUniqueBypassPayloads(allJobs, bypassModule)
+	allJobs = ts.filterUniqueBypassPayloads(allJobs, bypassModule)
 
 	totalJobs := len(allJobs)
 	if totalJobs == 0 {
@@ -283,9 +219,9 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 	// confirmed hit is recognisable without -mc.
 	var expandIdx map[string]int
 	expandBaseURL := ""
-	if s.expand.enabled {
-		s.expand.startTarget(targetURL)
-		s.expand.startBatch()
+	if ts.expand.enabled {
+		ts.expand.startTarget(targetURL)
+		ts.expand.startBatch()
 		expandIdx = make(map[string]int, totalJobs)
 		for i := range allJobs {
 			expandIdx[allJobs[i].PayloadToken] = i
@@ -313,19 +249,19 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 	// Create new progress bar
 	bar := NewProgressBar(prefix, progressbar.RedBar, 1, &s.progressBarEnabled)
 
-	count := s.scanBatch(worker, allJobs, expandIdx, false, bar)
+	count := s.scanBatch(worker, allJobs, expandIdx, false, bar, ts)
 
 	// -expand: the batch that just finished may have confirmed a hit. Decide
 	// here and send the derived batch; once it is sent this module's flow is
 	// over (depth 1: an expansion batch is never classified).
-	if s.expand.enabled {
+	if ts.expand.enabled {
 		if bypassModule == analysis.BaselineDumbCheck {
-			s.expand.finishBaseline()
-		} else if derived := s.expand.decide(bypassModule, targetURL, moduleComposer{
+			ts.expand.finishBaseline()
+		} else if derived := ts.expand.decide(bypassModule, targetURL, moduleComposer{
 			opts: s.scannerOpts, module: bypassModule, baseURL: expandBaseURL,
 			method: method, body: body,
 		}); len(derived) > 0 {
-			count += s.expandBatch(bypassModule, targetURL, prefix, derived)
+			count += s.expandBatch(bypassModule, targetURL, prefix, derived, ts)
 		}
 	}
 
@@ -341,7 +277,7 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 // attribution (an expansion batch is never observed). markExpanded tags the
 // stored curl commands as expansion output — the module field is left alone so
 // the results table still groups the rows under the module.
-func (s *Scanner) scanBatch(worker *BypassEngagement, jobs []payload.BypassPayload, jobIndex map[string]int, markExpanded bool, bar *ProgressBar) int {
+func (s *Scanner) scanBatch(worker *BypassEngagement, jobs []payload.BypassPayload, jobIndex map[string]int, markExpanded bool, bar *ProgressBar, ts *targetState) int {
 	totalJobs := len(jobs)
 	maxConcurrentReqs := s.scannerOpts.ConcurrentRequests
 
@@ -381,9 +317,9 @@ func (s *Scanner) scanBatch(worker *BypassEngagement, jobs []payload.BypassPaylo
 
 		// -expand: observe before the display filters drop the response
 		// (a -mc 200 run must still see the dumb_check denial).
-		if s.expand.enabled && jobIndex != nil {
+		if ts.expand.enabled && jobIndex != nil {
 			if idx, ok := jobIndex[string(response.DebugToken)]; ok {
-				s.expand.observe(response, jobs[idx])
+				ts.expand.observe(response, jobs[idx])
 			}
 		}
 
@@ -478,12 +414,12 @@ func (s *Scanner) scanBatch(worker *BypassEngagement, jobs []payload.BypassPaylo
 // expandBatch sends the derived requests for a confirmed hit through the same
 // pipeline as any other batch: the same worker settings, the same filters, the
 // same DB write path. Depth 1: an expansion batch is never classified again.
-func (s *Scanner) expandBatch(module, targetURL, prefix string, derived []payload.BypassPayload) int {
+func (s *Scanner) expandBatch(module, targetURL, prefix string, derived []payload.BypassPayload, ts *targetState) int {
 	jobs := expansionJobs(derived)
 
 	GB403Logger.Info().Msgf(
 		"Expansion: sending %d derived requests around a confirmed hit in %s (%d budget left for this target)",
-		len(jobs), module, s.expand.budget)
+		len(jobs), module, ts.expand.budget)
 
 	expWorker := NewBypassEngagement(module, targetURL, s.scannerOpts, len(jobs))
 	defer expWorker.Stop()
@@ -491,7 +427,7 @@ func (s *Scanner) expandBatch(module, targetURL, prefix string, derived []payloa
 	expBar := NewProgressBar(prefix+"+expand", progressbar.RedBar, 1, &s.progressBarEnabled)
 	// No job index: expansion responses are never observed, so they can never
 	// confirm a hit of their own.
-	return s.scanBatch(expWorker, jobs, nil, true, expBar)
+	return s.scanBatch(expWorker, jobs, nil, true, expBar, ts)
 }
 
 // ResendRequestFromToken
