@@ -275,6 +275,88 @@ exploitable". Matching is exact-digest only (no fuzzy matching), expansion is
 one round deep, and many modules have no mutator at all (most header families,
 `param_manipulation`, `user_agent`, …), so they expand nothing.
 
+## Adaptive ordering: fingerprint first, deep families last
+
+`-adaptive` spends the same requests in a better order. Every scan already
+starts with `dumb_check`, and its response is the target's **fingerprint** —
+status, `Server` header, marker headers and cookies, all already in hand, so
+the fingerprint costs **no extra request**. The modules that fingerprint points
+at run first, and the expensive deep families run only when the triage pass
+earned them.
+
+```bash
+# high-signal pass, in the order this front end wants to be probed
+gobypass403 -u "https://target.example/admin" -scan-profile triage -adaptive
+```
+
+### The heuristic table
+
+The table is data (`adaptive.Rules` in `core/engine/adaptive`), not vibes: each
+rule matches markers in the baseline response and **promotes** the modules
+listed, ahead of the rest, without ever adding or removing one — `-adaptive`
+only reorders the module list you asked for.
+
+| Front end (`Rule.Name`) | Fingerprint marker (`Server` header, header or cookie) | Promoted first |
+|---|---|---|
+| `cloudflare` | `cloudflare`, `cf-ray`, `cf-cache-status`, `cf-request-id`, `cf_clearance`, `__cf_bm`, `__cfduid` | `headers_ip`, `headers_host`, `end_paths`, `nginx_bypasses` |
+| `nginx` | `nginx` | `nginx_bypasses`, `end_paths`, `mid_paths`, `case_substitution` |
+| `haproxy` | `haproxy` | `haproxy_bypasses`, `end_paths`, `headers_url`, `case_substitution` |
+| `akamai` | `akamaighost`, `x-akamai`, `akamai-grn`, `ak_bmsc`, `_abck`, `bm_sz` | `headers_host`, `headers_url`, `path_prefix`, `case_substitution` |
+| `cloudfront` | `cloudfront`, `x-amz-cf-id`, `x-amz-cf-pop` | `headers_host`, `headers_url`, `headers_ip`, `end_paths` |
+| `azure` | `azure`, `x-azure-ref`, `x-msedge-ref` | `headers_host`, `headers_url`, `case_substitution`, `end_paths` |
+| `varnish` | `x-served-by`, `x-varnish`, `x-cache`, `x-fastly-request-id` | `headers_url`, `headers_host`, `char_encode`, `end_paths` |
+| `iis` | `microsoft-iis`, `x-aspnet`, `x-powered-by: asp.net` | `headers_method`, `case_substitution`, `char_encode`, `end_paths` |
+| `apache` | `apache` | `case_substitution`, `char_encode`, `end_paths`, `mid_paths` |
+| `f5` | `bigipserver`, `x-wa-info`, `ts01` | `headers_url`, `headers_host`, `end_paths` |
+
+Matching is a plain case-insensitive substring test over the baseline `Server`
+value, the raw response header lines and the cookies, so a `Server: nginx/1.24.0`
+or a `Set-Cookie: __cf_bm=…` promotes the same way. Each row encodes the module
+family that front end is known to mishandle — the `x-forwarded-*`/`cf-*`
+forwarding headers for Cloudflare, the path-normalisation quirks of
+nginx/haproxy, the caching and header handling of Varnish/Fastly, Akamai,
+CloudFront and F5. The table is pinned row by row in
+`core/engine/adaptive/adaptive_test.go`, and promotion is exercised on the wire
+on an `nginx` board in `tests/unittests/engine/scanner/adaptive_wire_test.go`.
+
+### Escalation: the deep families only after evidence
+
+The triage preset is the registry **minus the five deep families**
+(`path_prefix`, `unicode_path_normalization`, `unicode_path_truncation`,
+`unicode_path_experimental`, `param_manipulation`) — minutes per target instead
+of tens of thousands of payloads. With `-adaptive`, when a target's triage pass
+
+1. has a **403 baseline**, and
+2. produced at least one **`BYPASS` cluster** — a response that improved on that
+   baseline,
+
+the five deep families run for that target, once, through the normal pipeline,
+so `-max-reqs` still caps them and `-resume` checkpoints them like any other
+`(target, module)` pair. No evidence, no deep pass: a 403 target whose
+responses are all `DUP`/`VARIANT`, or a target that is not 403 at all, never
+escalates.
+
+Guardrails:
+
+- **Opt-in.** Without `-adaptive` nothing is fingerprinted, reordered or
+  escalated; the module order is exactly the `-m`/`-scan-profile` order and a
+  default run is unchanged.
+- **Promotion only.** Ordering never grows the module set; the only module
+  `-adaptive` can add is a deep family, and only after 403 **plus** a novel
+  cluster.
+- **No extra request for the fingerprint.** It is read from `dumb_check`, which
+  already runs first. Exclude it (`-em dumb_check`) and there is no fingerprint:
+  the run keeps the default order and says so once.
+- **Nothing already covered is repeated.** With `-m all` the deep families are
+  in the list already, so escalation has nothing to add.
+
+**Honest limits.** The table is a heuristic, not a fingerprint database: an
+unknown front end (or a stripped `Server` header) simply keeps the default
+order, and a wrong guess only changes *when* a module runs, never whether it
+runs. Escalation is all-or-nothing per target — it runs the whole deep set, not
+just the family that happened to match, so a single confirmed bypass can turn a
+triage run into a full deep pass (~46k payloads for a typical path).
+
 ## Long runs: request budget, resume and parallel targets
 
 Three flags make a long scan cheaper to run and cheaper to repeat. All three are
