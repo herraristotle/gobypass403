@@ -1,6 +1,6 @@
 package cli
 
-// Task W2 (SPEC-unkover-gaps.md Addendum 7): the -warn-wildcard opt-in.
+// Task W2 (SPEC-unkover-gaps.md Addendum 9): the -warn-wildcard opt-in.
 //
 // Internal tests for the flag itself: it must exist, be a plain boolean bound
 // to CliOptions.WarnWildcard, default to off, and -- unlike -expand, -adaptive

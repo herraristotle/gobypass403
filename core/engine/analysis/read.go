@@ -55,7 +55,7 @@ func Analyze(dbPath string) (Report, error) {
 }
 
 // TargetRows reads the analyzer projection for one target_url. The live scan
-// uses it once a target has finished, so the wildcard hint (Addendum 7) is
+// uses it once a target has finished, so the wildcard hint (Addendum 9) is
 // computed from exactly the rows -analyze sees, with the same classifier.
 func TargetRows(dbPath, targetURL string) ([]Row, error) {
 	if _, err := os.Stat(dbPath); err != nil {

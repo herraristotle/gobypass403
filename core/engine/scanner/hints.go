@@ -3,7 +3,7 @@ GoByPASS403
 Author: slicingmelon <github.com/slicingmelon>
 X: x.com/pedro_infosec
 
-Live half of the wildcard hint (SPEC-unkover-gaps.md Addendum 7). Read-only and
+Live half of the wildcard hint (SPEC-unkover-gaps.md Addendum 9). Read-only and
 post-hoc: the rows are already in the findings database when this runs, so the
 hint never costs a request, and it cannot disagree with -analyze, which
 classifies the same rows with the same code.

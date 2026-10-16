@@ -51,7 +51,7 @@ type ScannerOpts struct {
 	ReconCache                *recon.ReconCache
 	Expand                    bool // -expand: derive a bounded depth-1 batch around a confirmed hit (Addendum 5 Phase B)
 	Adaptive                  bool // -adaptive: fingerprint the baseline, promote matching modules, escalate deep families (Addendum 5 Phase C)
-	WarnWildcard              bool // -warn-wildcard: hint when a BYPASS cluster looks like a catch-all (Addendum 7)
+	WarnWildcard              bool // -warn-wildcard: hint when a BYPASS cluster looks like a catch-all (Addendum 9)
 	MaxReqs                   int  // -max-reqs: hard stop after this many requests, 0 = unlimited (Addendum 5 Phase D)
 	// Progress is the resume checkpoint (Addendum 5 Phase D). Non-nil only for
 	// -resume runs: completed (target, module) pairs are skipped and every newly
@@ -139,7 +139,7 @@ func (s *Scanner) reportTarget(url string, totalFindings int) {
 	GB403Logger.Success().Msgf("Found %d results for %s", totalFindings, url)
 	fmt.Println()
 
-	// Addendum 7: with -warn-wildcard, name catch-all-shaped clusters. Printed
+	// Addendum 9: with -warn-wildcard, name catch-all-shaped clusters. Printed
 	// after the summary and read-only, so a run without the flag is unchanged.
 	if s.scannerOpts.WarnWildcard {
 		if err := PrintWildcardHints(url); err != nil {

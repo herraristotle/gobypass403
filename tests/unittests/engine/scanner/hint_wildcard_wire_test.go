@@ -1,6 +1,6 @@
 package tests
 
-// Addendum 7: the live wildcard hint.
+// Addendum 9: the live wildcard hint.
 //
 // A BYPASS cluster whose members come from many distinct requests is the shape
 // of a catch-all. With -warn-wildcard the run says so, after the summary,

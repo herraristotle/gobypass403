@@ -3,7 +3,7 @@ GoByPASS403
 Author: slicingmelon <github.com/slicingmelon>
 X: x.com/pedro_infosec
 
-Wildcard hint (SPEC-unkover-gaps.md Addendum 7). A BYPASS cluster whose members
+Wildcard hint (SPEC-unkover-gaps.md Addendum 9). A BYPASS cluster whose members
 come from many distinct requests is the shape of a catch-all: one page served
 for everything, classified BYPASS only because the run had no negative control
 to compare against. The hint names that shape and points at -calibrate. It is

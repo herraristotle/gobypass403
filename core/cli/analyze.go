@@ -56,7 +56,7 @@ func (r *Runner) handleAnalyze() error {
 }
 
 // printWildcardHints names the catch-all-shaped clusters of an offline report
-// (Addendum 7). Same rule as the live run -- WildcardHints over the classified
+// (Addendum 9). Same rule as the live run -- WildcardHints over the classified
 // report -- so both paths say the same thing about the same database, and the
 // hint stays a hint: it names a shape and the remedy, it suppresses nothing.
 func printWildcardHints(report analysis.Report) {

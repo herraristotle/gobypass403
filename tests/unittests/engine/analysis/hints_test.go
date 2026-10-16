@@ -1,6 +1,6 @@
 package tests
 
-// Addendum 7: the wildcard hint.
+// Addendum 9: the wildcard hint.
 //
 // A BYPASS cluster whose members come from many distinct requests is the shape
 // of a catch-all: one page served for everything, classified BYPASS only
