@@ -65,6 +65,19 @@ func (r *Runner) Initialize() error {
 		GB403Logger.Info().Msgf("Request budget: hard stop after %d requests\n", opts.MaxReqs)
 	}
 
+	// Addendum 5 Phase D: -resume continues a run that stopped early. The
+	// checkpoint lives in the outdir next to results.db; a damaged one is
+	// reported and the run simply rescans everything.
+	var progress *scanner.Progress
+	if opts.Resume {
+		var loadErr error
+		progress, loadErr = scanner.LoadProgress(scanner.ProgressPath(r.RunnerOptions.OutDir))
+		if loadErr != nil {
+			GB403Logger.Warning().Msgf("%v\n", loadErr)
+		}
+		GB403Logger.Info().Msgf("Resume: %d completed (target, module) pairs will be skipped\n", progress.Count())
+	}
+
 	// Set ResultsDBFile if not already set
 	if r.RunnerOptions.ResultsDBFile == "" {
 		r.RunnerOptions.ResultsDBFile = filepath.Join(r.RunnerOptions.OutDir, "results.db")
@@ -134,6 +147,7 @@ func (r *Runner) Initialize() error {
 		ParsedRequest:             r.RunnerOptions.ParsedRequest,
 		Expand:                    r.RunnerOptions.Expand,
 		MaxReqs:                   r.RunnerOptions.MaxReqs,
+		Progress:                  progress,
 
 		ReconCache: r.UrlRecon.reconService.GetReconCache(),
 	}

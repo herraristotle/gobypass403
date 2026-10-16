@@ -176,6 +176,12 @@ func (s *Scanner) RunAllBypasses(targetURL string) int {
 	// Reset the global seen RawURIs map for this new target URL
 	ResetSeenRawURIs()
 
+	// Addendum 5 Phase D: with -resume the checkpoint names the (target,
+	// module) pairs that already finished, and each pair is made durable as
+	// soon as its module completes, so a crash loses at most the module that
+	// was running. Both calls are nil-safe, so a plain run pays nothing.
+	progress := s.scannerOpts.Progress
+
 	modules := strings.Split(s.scannerOpts.BypassModule, ",")
 	for _, module := range modules {
 		module = strings.TrimSpace(module)
@@ -183,8 +189,18 @@ func (s *Scanner) RunAllBypasses(targetURL string) int {
 			continue
 		}
 
+		if progress.Has(targetURL, module) {
+			GB403Logger.Verbose().Msgf("Skipping %s for %s (already scanned)\n", module, targetURL)
+			continue
+		}
+
 		findings := s.RunBypassModule(module, targetURL)
 		totalFindings += findings
+
+		progress.Mark(targetURL, module)
+		if err := progress.Save(); err != nil {
+			GB403Logger.Warning().Msgf("Could not update the resume checkpoint: %v\n", err)
+		}
 	}
 
 	return totalFindings

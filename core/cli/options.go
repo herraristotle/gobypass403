@@ -35,6 +35,7 @@ type CliOptions struct {
 	ScanProfile              string // -scan-profile preset: full (default) | triage (Addendum 4)
 	Expand                   bool   // -expand: derive a bounded depth-1 batch around a confirmed hit (Addendum 5 Phase B)
 	MaxReqs                  int    // -max-reqs: hard stop after this many requests, 0 = unlimited (Addendum 5 Phase D)
+	Resume                   bool   // -resume: skip (target, module) pairs a previous run already finished (Addendum 5 Phase D)
 	MatchStatusCodesStr      string
 	MatchStatusCodes         []int
 	MatchContentType         string   // New field for multiple types
@@ -486,6 +487,9 @@ func (o *CliOptions) validateAnalyze() error {
 	}
 	if o.MaxReqs > 0 {
 		return fmt.Errorf("-analyze cannot be used with -max-reqs (analysis performs no requests)")
+	}
+	if o.Resume {
+		return fmt.Errorf("-analyze cannot be used with -resume (analysis performs no requests)")
 	}
 	return nil
 }

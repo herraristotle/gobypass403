@@ -50,6 +50,10 @@ type ScannerOpts struct {
 	ReconCache                *recon.ReconCache
 	Expand                    bool // -expand: derive a bounded depth-1 batch around a confirmed hit (Addendum 5 Phase B)
 	MaxReqs                   int  // -max-reqs: hard stop after this many requests, 0 = unlimited (Addendum 5 Phase D)
+	// Progress is the resume checkpoint (Addendum 5 Phase D). Non-nil only for
+	// -resume runs: completed (target, module) pairs are skipped and every newly
+	// finished one is recorded. nil means checkpointing is off.
+	Progress *Progress
 }
 
 // Scanner represents the main scanner structure, perhaps the highest level in the hierarchy of the tool
