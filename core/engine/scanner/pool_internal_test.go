@@ -99,14 +99,17 @@ func TestGroupTargetsByHostKeepsUnparseableTargetsAlone(t *testing.T) {
 
 func TestTargetPoolScansOneTargetPerHostAtOnce(t *testing.T) {
 	h1, h2 := newGate(), newGate()
-	var once sync.Once
-	release := func() { once.Do(func() { close(h1.release); close(h2.release) }) }
-	defer release()
 
 	srv1 := httptest.NewServer(h1.board())
 	defer srv1.Close()
 	srv2 := httptest.NewServer(h2.board())
 	defer srv2.Close()
+
+	// Registered last so it runs first: a failing assertion must unblock the
+	// parked requests before the servers are closed, or Close would wait on them.
+	var once sync.Once
+	release := func() { once.Do(func() { close(h1.release); close(h2.release) }) }
+	defer release()
 
 	urls := []string{srv1.URL + "/a", srv1.URL + "/b", srv2.URL + "/c", srv2.URL + "/d"}
 	s := NewScanner(poolOpts(4), urls)
