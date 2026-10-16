@@ -209,8 +209,10 @@ func ReadPayloadsFromFile(filename string) ([]string, error) {
 		return payloads, nil
 	}
 
-	// Fallback to embedded FS if local read fails
-	content, err := DefaultPayloadsDir.ReadFile(filename)
+	// Fallback to embedded FS if local read fails. The embed root is the
+	// payloads/ directory, so the path must be prefixed (same as every other
+	// DefaultPayloadsDir read and ReadPayloadsFromJSONFile).
+	content, err := DefaultPayloadsDir.ReadFile("payloads/" + filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read payload file %s: %w", filename, err)
 	}
