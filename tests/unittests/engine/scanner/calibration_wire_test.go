@@ -23,10 +23,11 @@ import (
 // the target itself with the board's default 403.
 func soft404Accept(req string) bool { return req != "GET /access" }
 
-// calibrationOpts is a plain wire run with the control module in the list.
+// calibrationOpts is a plain wire run with the control module in the list:
+// `-calibrate` reaches the scanner as the synthetic module, so the module list
+// is what turns the control on.
 func calibrationOpts(calibrate, expand bool) *scanner.ScannerOpts {
 	o := wireOpts(expand)
-	o.Calibrate = calibrate
 	if calibrate {
 		o.BypassModule = "dumb_check," + analysis.CalibrationModule + ",http_methods"
 	} else {

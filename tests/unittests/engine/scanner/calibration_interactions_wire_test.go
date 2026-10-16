@@ -34,7 +34,6 @@ func TestAdaptiveRunsCalibrationBeforeThePromotedModule(t *testing.T) {
 	target := board.url("/access")
 
 	opts := adaptiveOpts(adaptiveCalibrationModules, true)
-	opts.Calibrate = true
 	s := scanner.NewScanner(opts, []string{target})
 	s.RunAllBypasses(target)
 
@@ -81,7 +80,6 @@ func adaptiveSoft404(t *testing.T, calibrate bool, maxReqs int) []string {
 		modules = "dumb_check," + analysis.CalibrationModule + ",http_methods"
 	}
 	opts := adaptiveOpts(modules, true)
-	opts.Calibrate = calibrate
 	opts.MaxReqs = maxReqs
 
 	s := scanner.NewScanner(opts, []string{target})
