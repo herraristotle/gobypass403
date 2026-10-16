@@ -129,6 +129,24 @@ func (e *expandState) decide(module, targetURL string, composer expand.Composer)
 	return derived
 }
 
+// expandMarker tags a stored curl command as expansion output. It is a shell
+// comment, so a copy-pasted PoC still runs; the module field is left alone so
+// the results table keeps grouping the row under its module.
+const expandMarker = " # expanded"
+
+// expansionJobs turns derived payloads into real jobs: same shape as a
+// module's own jobs, with the debug token generated from the final request, so
+// the DB row, the display and `-r` resends cannot tell an expansion request
+// from any other one apart from the marker.
+func expansionJobs(derived []payload.BypassPayload) []payload.BypassPayload {
+	jobs := make([]payload.BypassPayload, 0, len(derived))
+	for _, p := range derived {
+		p.PayloadToken = payload.GeneratePayloadToken(p)
+		jobs = append(jobs, p)
+	}
+	return jobs
+}
+
 // moduleComposer re-runs a module's *own* generator against an arbitrary
 // RawURI: expansion is then "the module's transformation, applied once more to
 // the shape that worked", instead of a reimplementation that could drift from

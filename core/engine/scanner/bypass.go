@@ -292,14 +292,44 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 	worker := NewBypassEngagement(bypassModule, targetURL, s.scannerOpts, totalJobs)
 	defer worker.Stop()
 
-	maxConcurrentReqs := s.scannerOpts.ConcurrentRequests
-
 	// Create formatted prefix with padding for progress bar
 	prefix := bypassModule + strings.Repeat(" ", maxModuleNameLength-len(bypassModule)+1)
 	// Create new progress bar
 	bar := NewProgressBar(prefix, progressbar.RedBar, 1, &s.progressBarEnabled)
 
-	responses := worker.requestPool.ProcessRequests(allJobs)
+	count := s.scanBatch(worker, allJobs, expandIdx, false, bar)
+
+	// -expand: the batch that just finished may have confirmed a hit. Decide
+	// here and send the derived batch; once it is sent this module's flow is
+	// over (depth 1: an expansion batch is never classified).
+	if s.expand.enabled {
+		if bypassModule == analysis.BaselineDumbCheck {
+			s.expand.finishBaseline()
+		} else if derived := s.expand.decide(bypassModule, targetURL, moduleComposer{
+			opts: s.scannerOpts, module: bypassModule, baseURL: expandBaseURL,
+			method: method, body: body,
+		}); len(derived) > 0 {
+			count += s.expandBatch(bypassModule, targetURL, prefix, derived)
+		}
+	}
+
+	return count
+}
+
+// scanBatch runs one batch of jobs through the shared pipeline: progress bar,
+// the display filters, result rows and the DB writes. It returns how many
+// findings were stored.
+//
+// jobIndex maps a job's payload token back to its slot in jobs, which is how a
+// response is attributed to the request that produced it; nil disables that
+// attribution (an expansion batch is never observed). markExpanded tags the
+// stored curl commands as expansion output — the module field is left alone so
+// the results table still groups the rows under the module.
+func (s *Scanner) scanBatch(worker *BypassEngagement, jobs []payload.BypassPayload, jobIndex map[string]int, markExpanded bool, bar *ProgressBar) int {
+	totalJobs := len(jobs)
+	maxConcurrentReqs := s.scannerOpts.ConcurrentRequests
+
+	responses := worker.requestPool.ProcessRequests(jobs)
 	var dbWg sync.WaitGroup
 	resultCount := atomic.Int32{}
 
@@ -320,9 +350,9 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 
 		// -expand: observe before the display filters drop the response
 		// (a -mc 200 run must still see the dumb_check denial).
-		if s.expand.enabled {
-			if idx, ok := expandIdx[string(response.DebugToken)]; ok {
-				s.expand.observe(response, allJobs[idx])
+		if s.expand.enabled && jobIndex != nil {
+			if idx, ok := jobIndex[string(response.DebugToken)]; ok {
+				s.expand.observe(response, jobs[idx])
 			}
 		}
 
@@ -369,6 +399,9 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 
 		// Process valid result
 		sanitizedCurlCmd := helpers.SanitizeNonPrintableBytesForCurl(response.CurlCommand)
+		if markExpanded {
+			sanitizedCurlCmd += expandMarker
+		}
 
 		result := &Result{
 			TargetURL:           string(response.URL),
@@ -408,22 +441,26 @@ func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
 
 	dbWg.Wait()
 
-	// -expand: the batch that just finished may have confirmed a hit. Decide
-	// here; the derived batch is sent by expandBatch.
-	if s.expand.enabled {
-		if bypassModule == analysis.BaselineDumbCheck {
-			s.expand.finishBaseline()
-		} else if derived := s.expand.decide(bypassModule, targetURL, moduleComposer{
-			opts: s.scannerOpts, module: bypassModule, baseURL: expandBaseURL,
-			method: method, body: body,
-		}); len(derived) > 0 {
-			GB403Logger.Info().Msgf(
-				"Expansion: derived %d requests around a confirmed hit in %s (%d budget left for this target)",
-				len(derived), bypassModule, s.expand.budget)
-		}
-	}
-
 	return int(resultCount.Load())
+}
+
+// expandBatch sends the derived requests for a confirmed hit through the same
+// pipeline as any other batch: the same worker settings, the same filters, the
+// same DB write path. Depth 1: an expansion batch is never classified again.
+func (s *Scanner) expandBatch(module, targetURL, prefix string, derived []payload.BypassPayload) int {
+	jobs := expansionJobs(derived)
+
+	GB403Logger.Info().Msgf(
+		"Expansion: sending %d derived requests around a confirmed hit in %s (%d budget left for this target)",
+		len(jobs), module, s.expand.budget)
+
+	expWorker := NewBypassEngagement(module, targetURL, s.scannerOpts, len(jobs))
+	defer expWorker.Stop()
+
+	expBar := NewProgressBar(prefix+"+expand", progressbar.RedBar, 1, &s.progressBarEnabled)
+	// No job index: expansion responses are never observed, so they can never
+	// confirm a hit of their own.
+	return s.scanBatch(expWorker, jobs, nil, true, expBar)
 }
 
 // ResendRequestFromToken
