@@ -113,6 +113,7 @@ func flagDefinitions(opts *CliOptions) []multiFlag {
 		{name: "expand", usage: "Expand around a confirmed hit: derive a bounded depth-1 batch from the request that worked (off by default; 256 extra requests per hit, 1024 per target)", value: &opts.Expand, defVal: false},
 		{name: "max-reqs", usage: "Hard stop after this many requests across the whole run (0 = unlimited). Counts every request sent, including expansion batches", value: &opts.MaxReqs, defVal: 0},
 		{name: "resume", usage: "Continue an interrupted run: skip the (target, module) pairs scan.progress.json in the output dir already marks complete", value: &opts.Resume, defVal: false},
+		{name: "tw", usage: "Scan this many targets at once, at most one per host (1 = sequential, the default). Disables the progress bar and prints each target's table as it finishes", value: &opts.TargetWorkers, defVal: 1},
 		{name: "update-payloads", usage: "Update payload files to latest version", value: &opts.UpdatePayloads, defVal: false},
 	}
 }

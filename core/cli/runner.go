@@ -78,6 +78,15 @@ func (r *Runner) Initialize() error {
 		GB403Logger.Info().Msgf("Resume: %d completed (target, module) pairs will be skipped\n", progress.Count())
 	}
 
+	// Addendum 5 Phase D: parallel targets cannot share one progress bar, and
+	// they print in completion order, so say so once when the pool is on.
+	if opts.TargetWorkers > 1 {
+		if !opts.DisableProgressBar {
+			GB403Logger.Warning().Msgf("Parallel targets (-tw %d) disable the progress bar\n", opts.TargetWorkers)
+		}
+		GB403Logger.Info().Msgf("Parallel targets: up to %d at once, at most one per host\n", opts.TargetWorkers)
+	}
+
 	// Set ResultsDBFile if not already set
 	if r.RunnerOptions.ResultsDBFile == "" {
 		r.RunnerOptions.ResultsDBFile = filepath.Join(r.RunnerOptions.OutDir, "results.db")
@@ -148,6 +157,7 @@ func (r *Runner) Initialize() error {
 		Expand:                    r.RunnerOptions.Expand,
 		MaxReqs:                   r.RunnerOptions.MaxReqs,
 		Progress:                  progress,
+		ConcurrentTargets:         r.RunnerOptions.TargetWorkers,
 
 		ReconCache: r.UrlRecon.reconService.GetReconCache(),
 	}

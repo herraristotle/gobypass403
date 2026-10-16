@@ -36,6 +36,7 @@ type CliOptions struct {
 	Expand                   bool   // -expand: derive a bounded depth-1 batch around a confirmed hit (Addendum 5 Phase B)
 	MaxReqs                  int    // -max-reqs: hard stop after this many requests, 0 = unlimited (Addendum 5 Phase D)
 	Resume                   bool   // -resume: skip (target, module) pairs a previous run already finished (Addendum 5 Phase D)
+	TargetWorkers            int    // -tw: scan this many targets at once, one per host (Addendum 5 Phase D)
 	MatchStatusCodesStr      string
 	MatchStatusCodes         []int
 	MatchContentType         string   // New field for multiple types
@@ -323,6 +324,10 @@ func (o *CliOptions) validate() error {
 		return err
 	}
 
+	if err := o.validateTargetWorkers(); err != nil {
+		return err
+	}
+
 	// Check for update payloads first
 	if o.UpdatePayloads {
 		if err := payload.UpdatePayloads(); err != nil {
@@ -462,6 +467,15 @@ func (o *CliOptions) validate() error {
 func (o *CliOptions) validateRequestBudget() error {
 	if o.MaxReqs < 0 {
 		return fmt.Errorf("invalid -max-reqs value %d: must be 0 (unlimited) or a positive request count", o.MaxReqs)
+	}
+	return nil
+}
+
+// validateTargetWorkers validates -tw. 1 (the default) keeps the sequential
+// scan; 0 or a negative count is ambiguous, so it is rejected.
+func (o *CliOptions) validateTargetWorkers() error {
+	if o.TargetWorkers < 1 {
+		return fmt.Errorf("invalid -tw value %d: must be a positive target count (default 1)", o.TargetWorkers)
 	}
 	return nil
 }
