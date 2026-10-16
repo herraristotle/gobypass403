@@ -571,6 +571,8 @@ For a URL like `/a/b`, the module creates these variants:
 
 Each variant is generated with appropriate path normalization handling. The module carefully manages special characters in path segments, generating additional variants with percent-encoded `?` and `#` characters when necessary.
 
+The list also carries the **parser-inconsistency atoms** — the ASCII control range `%00`–`%1F`, the ASCII punctuation/symbol set, space `%20` and DEL `%7F` — so they are inserted *inside* the path (`/admin%00/config`, `/admin/%00/config`, `/%00admin/config`), not only at the end. That interior placement is what a front end and an application disagree about when they read a whitespace byte, a `;` or a `\` inside the path (Orange Tsai, *A New Era of SSRF*; Rafael da Costa Santos, *Exploiting HTTP Parsers Inconsistencies*). `end_paths` covers the same atoms at the tail only, so the two modules are complementary. Atoms are percent-encoded, never raw; a bare `%0D%0A` pair is deliberately excluded (that is request-splitting, a different class). They are deduped against the rest of the corpus (case-insensitively, since `%2f` and `%2F` denote the same byte), and `unicode_path_experimental` skips percent-encoded sequences, so the addition is a no-op for that module.
+
 ## 3. end_paths 
 
 The `end_paths` module appends a variety of suffixes from a predefined list (`internal_endpaths.lst`) to the end of the URL path. This technique targets path normalization vulnerabilities and extension handling issues in WAFs.
