@@ -181,6 +181,8 @@ Usage:
         Scan scope preset: full (all bypass modules) or triage (high-signal subset for first-pass triage; explicit -m wins, -em subtracts) (Default: full)
   -adaptive
         Order the modules by the baseline fingerprint and run the deep families once a confirmed 403 produced a novel cluster (off by default; the fingerprint costs no extra request) (Default: false)
+  -calibrate
+        Send a negative-control probe to a path that cannot exist and suppress any result matching it (kills wildcard/soft-404 false positives; off by default, costs 3 requests per target) (Default: false)
   -expand
         Expand around a confirmed hit: derive a bounded depth-1 batch from the request that worked (off by default; 256 extra requests per hit, 1024 per target) (Default: false)
   -max-reqs
@@ -206,6 +208,7 @@ recon — and classifies every response against that target's baseline:
 | `VARIANT` | same status class, different body (a different block page, a soft-404, …) |
 | `DUP` | exactly the baseline response |
 | `NOISE` | empty, non-improving artifact |
+| `CALIBRATED` | matches the `-calibrate` negative control — the server's wildcard/soft-404 default, never a finding |
 
 Responses are clustered by exact `(status, media type, sha256(body), length)`,
 so hundreds of near-identical hits collapse into **one** line that states how
@@ -230,6 +233,37 @@ the preview are treated as identical; clustering is exact-digest only (no
 fuzzy matching); and `BYPASS` means "the response changed", not "this is
 exploitable" — every cluster prints its ready-to-run `curl` command so you
 can confirm by hand.
+
+## Wildcard calibration: killing the soft-404 false positive
+
+Some servers answer **every** unknown path with a success page — a wildcard
+`200`, a catch-all "not found" served as `200`, or an SPA fallback. A 403
+baseline against such a server makes the classifier read *any* payload `200` as
+a `BYPASS`, when the server served nothing. The fix is a **negative control**:
+ask for a path that cannot exist and see what the server does with it.
+
+```bash
+gobypass403 -u "https://target.example/admin/.env" -calibrate
+```
+
+`-calibrate` sends three probes to random non-existent siblings of the target's
+own path (e.g. `/admin/<random>`), records them as the synthetic `calibration`
+module, and marks any cluster matching a control as **`CALIBRATED`** — never
+`BYPASS`. A cluster matches when it has the same status and media type and
+either an **identical body digest** (an exact wildcard) or a length within
+**±50 bytes** (an echoing soft-404, which stamps the requested path and so
+changes size but not shape). Control rows are stored even when `-mc`/`-mcl`
+would drop them, so the offline `-analyze` report sees them too. `-expand` and
+`-adaptive` act only on `BYPASS`, so a calibrated cluster is never expanded or
+escalated.
+
+- **Opt-in.** Without `-calibrate` there is no probe request and no new row;
+  the scan and its report are byte-identical to today.
+- **`-calibrate` is the driver, not a module.** It is injected after
+  `dumb_check` and never appears in `-m all` or a `-scan-profile` set.
+- **Honest limits.** Matching relies on the stored length: with a small `-rbps`
+  two distinct large bodies can both read as the preview cap and match. The
+  digest-equal path is exact; when in doubt, read the `curl` PoC in the report.
 
 ## Feedback Expansion: expand around a confirmed hit
 

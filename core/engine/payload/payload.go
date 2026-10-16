@@ -173,6 +173,8 @@ func (pg *PayloadGenerator) Generate() []BypassPayload {
 		return pg.GenerateHAProxyBypassPayloads(pg.targetURL, pg.bypassModule)
 	case "unicode_path_experimental":
 		return pg.GenerateUnicodePathExperimentalPayloads(pg.targetURL, pg.bypassModule)
+	case "calibration":
+		return pg.GenerateCalibrationPayloads(pg.targetURL, pg.bypassModule)
 	default:
 		//GB403Logger.Warning().Msgf("Unknown bypass module: %s\n", pg.bypassModule)
 		return []BypassPayload{}

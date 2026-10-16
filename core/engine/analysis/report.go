@@ -33,6 +33,9 @@ func (r Report) Text() string {
 	for _, t := range r.Targets {
 		fmt.Fprintf(&b, "\n=== %s ===\n", t.TargetURL)
 		fmt.Fprintf(&b, "baseline: %s (status %d)\n", t.BaselineSource, t.BaselineStatus)
+		if t.CalibrationControls > 0 {
+			fmt.Fprintf(&b, "calibration: %d control response(s)\n", t.CalibrationControls)
+		}
 
 		for _, c := range t.Clusters {
 			mediaType := c.Fingerprint.MediaType

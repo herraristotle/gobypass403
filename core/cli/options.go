@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/slicingmelon/gobypass403/core/engine/adaptive"
+	"github.com/slicingmelon/gobypass403/core/engine/analysis"
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
 	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
 	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
@@ -36,6 +37,7 @@ type CliOptions struct {
 	ScanProfile              string // -scan-profile preset: full (default) | triage (Addendum 4)
 	Expand                   bool   // -expand: derive a bounded depth-1 batch around a confirmed hit (Addendum 5 Phase B)
 	Adaptive                 bool   // -adaptive: order modules by the baseline fingerprint, escalate the deep families after a confirmed 403 plus a novel cluster (Addendum 5 Phase C)
+	Calibrate                bool   // -calibrate: send a negative-control probe and suppress clusters matching it (Addendum 6)
 	MaxReqs                  int    // -max-reqs: hard stop after this many requests, 0 = unlimited (Addendum 5 Phase D)
 	Resume                   bool   // -resume: skip (target, module) pairs a previous run already finished (Addendum 5 Phase D)
 	TargetWorkers            int    // -tw: scan this many targets at once, one per host (Addendum 5 Phase D)
@@ -500,6 +502,9 @@ func (o *CliOptions) validateAnalyze() error {
 	if o.Adaptive {
 		return fmt.Errorf("-analyze cannot be used with -adaptive (analysis performs no requests)")
 	}
+	if o.Calibrate {
+		return fmt.Errorf("-analyze cannot be used with -calibrate (analysis performs no requests)")
+	}
 	if o.MaxReqs > 0 {
 		return fmt.Errorf("-analyze cannot be used with -max-reqs (analysis performs no requests)")
 	}
@@ -673,6 +678,15 @@ func (o *CliOptions) validateModule() error {
 	// Always prepend dumb_check unless explicitly excluded
 	if !slices.Contains(finalModules, "dumb_check") {
 		finalModules = append([]string{"dumb_check"}, finalModules...)
+	}
+
+	// Addendum 6: `-calibrate` runs the negative-control module right after the
+	// baseline, so every later module is classified against the wildcard shape.
+	// It is deliberately not in AvailableModules: it is a control, not a user
+	// bypass module, and stays out of `-m all`.
+	if o.Calibrate && !slices.Contains(finalModules, analysis.CalibrationModule) {
+		i := slices.Index(finalModules, "dumb_check")
+		finalModules = slices.Insert(finalModules, i+1, analysis.CalibrationModule)
 	}
 
 	// Join back to comma-separated string

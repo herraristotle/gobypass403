@@ -26,7 +26,12 @@ import (
 
 // IsValidBypassModule checks if a module is valid
 func IsValidBypassModule(moduleName string) bool {
-	return slices.Contains(payload.BypassModulesRegistry, moduleName)
+	// Addendum 6: `calibration` is the negative-control module. It is not in
+	// BypassModulesRegistry (it is not a bypass, and must stay out of -m all and
+	// the profile presets) but -calibrate injects it, so the scan path accepts
+	// it. Its debug token carries the module name as a string.
+	return moduleName == analysis.CalibrationModule ||
+		slices.Contains(payload.BypassModulesRegistry, moduleName)
 }
 
 type BypassEngagement struct {
@@ -125,6 +130,15 @@ func (s *Scanner) RunAllBypasses(targetURL string) int {
 		} else {
 			ts.adaptive.fingerprintRequest()
 			totalFindings += s.runModule(baseline, targetURL, ts, progress)
+
+			// Addendum 6: the negative-control probes run right after the
+			// baseline and before ordering, so every module this target runs
+			// is classified against the wildcard shape.
+			if cal, rem := splitCalibration(rest); cal != "" {
+				totalFindings += s.runModule(cal, targetURL, ts, progress)
+				rest = rem
+			}
+
 			if ts.adaptive.haveBaseline {
 				modules = ts.adaptive.order(rest)
 			} else {
@@ -214,6 +228,17 @@ func splitBaseline(modules []string) (string, []string) {
 	}
 	baseline := modules[i]
 	return baseline, slices.Delete(slices.Clone(modules), i, i+1)
+}
+
+// splitCalibration removes the negative-control module from the list, returning
+// it and the remaining modules in order, so an adaptive run sends it right
+// after the baseline (Addendum 6). Empty when calibration is off.
+func splitCalibration(modules []string) (string, []string) {
+	i := slices.Index(modules, analysis.CalibrationModule)
+	if i < 0 {
+		return "", modules
+	}
+	return modules[i], slices.Delete(slices.Clone(modules), i, i+1)
 }
 
 // effectiveTargetURL rebuilds the generation URL from an imported request
@@ -336,10 +361,13 @@ func (s *Scanner) runBypassModule(bypassModule string, targetURL string, ts *tar
 
 	// -expand: the batch that just finished may have confirmed a hit. Decide
 	// here and send the derived batch; once it is sent this module's flow is
-	// over (depth 1: an expansion batch is never classified).
+	// over (depth 1: an expansion batch is never classified). The calibration
+	// module (Addendum 6) folds its probes into the baseline instead.
 	if ts.expand.enabled {
 		if bypassModule == analysis.BaselineDumbCheck {
 			ts.expand.finishBaseline()
+		} else if bypassModule == analysis.CalibrationModule {
+			ts.expand.finishControls()
 		} else if derived := ts.expand.decide(bypassModule, targetURL, moduleComposer{
 			opts: s.scannerOpts, module: bypassModule, baseURL: expandBaseURL,
 			method: method, body: body,
@@ -421,44 +449,52 @@ func (s *Scanner) scanBatch(worker *BypassEngagement, jobs []payload.BypassPaylo
 			}
 		}
 
-		// Check status code - if no match, skip
-		if !matchStatusCodes(response.StatusCode, s.scannerOpts.MatchStatusCodes) {
-			rawhttp.ReleaseResponseDetails(response)
-			bar.Progress((float64(completed) / float64(totalJobs)) * 100.0)
-			continue
-		}
+		// Addendum 6: a calibration control is never a finding, but its row must
+		// reach the DB so the offline analysis can recognise the target's
+		// wildcard. It therefore skips the display filters (a -mc 200 run would
+		// otherwise drop a 404/403 control and the wildcard would slip back in).
+		isControl := string(response.BypassModule) == analysis.CalibrationModule
 
-		// Check content type if required
-		if len(s.scannerOpts.MatchContentTypeBytes) > 0 {
-			contentTypeMatched := false
-			for _, matchType := range s.scannerOpts.MatchContentTypeBytes {
-				if bytes.Contains(response.ContentType, matchType) {
-					contentTypeMatched = true
-					break
+		if !isControl {
+			// Check status code - if no match, skip
+			if !matchStatusCodes(response.StatusCode, s.scannerOpts.MatchStatusCodes) {
+				rawhttp.ReleaseResponseDetails(response)
+				bar.Progress((float64(completed) / float64(totalJobs)) * 100.0)
+				continue
+			}
+
+			// Check content type if required
+			if len(s.scannerOpts.MatchContentTypeBytes) > 0 {
+				contentTypeMatched := false
+				for _, matchType := range s.scannerOpts.MatchContentTypeBytes {
+					if bytes.Contains(response.ContentType, matchType) {
+						contentTypeMatched = true
+						break
+					}
+				}
+				if !contentTypeMatched {
+					rawhttp.ReleaseResponseDetails(response)
+					bar.Progress((float64(completed) / float64(totalJobs)) * 100.0)
+					continue
 				}
 			}
-			if !contentTypeMatched {
-				rawhttp.ReleaseResponseDetails(response)
-				bar.Progress((float64(completed) / float64(totalJobs)) * 100.0)
-				continue
-			}
-		}
 
-		// Check min content length
-		if s.scannerOpts.MinContentLength > 0 {
-			if response.ContentLength < 0 || response.ContentLength < int64(s.scannerOpts.MinContentLength) {
-				rawhttp.ReleaseResponseDetails(response)
-				bar.Progress((float64(completed) / float64(totalJobs)) * 100.0)
-				continue
+			// Check min content length
+			if s.scannerOpts.MinContentLength > 0 {
+				if response.ContentLength < 0 || response.ContentLength < int64(s.scannerOpts.MinContentLength) {
+					rawhttp.ReleaseResponseDetails(response)
+					bar.Progress((float64(completed) / float64(totalJobs)) * 100.0)
+					continue
+				}
 			}
-		}
 
-		// Check max content length
-		if s.scannerOpts.MaxContentLength > 0 && response.ContentLength >= 0 {
-			if response.ContentLength > int64(s.scannerOpts.MaxContentLength) {
-				rawhttp.ReleaseResponseDetails(response)
-				bar.Progress((float64(completed) / float64(totalJobs)) * 100.0)
-				continue
+			// Check max content length
+			if s.scannerOpts.MaxContentLength > 0 && response.ContentLength >= 0 {
+				if response.ContentLength > int64(s.scannerOpts.MaxContentLength) {
+					rawhttp.ReleaseResponseDetails(response)
+					bar.Progress((float64(completed) / float64(totalJobs)) * 100.0)
+					continue
+				}
 			}
 		}
 

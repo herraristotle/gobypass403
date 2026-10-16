@@ -27,15 +27,27 @@ const (
 	BaselineModal     = "modal"      // no dumb_check rows; target's most common shape was
 )
 
+// CalibrationModule is the synthetic module whose rows are the negative
+// control of a `-calibrate` run (Addendum 6): responses to a path that cannot
+// exist. A cluster matching one is the server's default response, not a hit.
+const CalibrationModule = "calibration"
+
+// calibrationTolerance is how far a response length may differ from a control
+// and still be considered the same default page (unKover `is_wildcard` uses
+// the same 50-byte allowance). An identical body digest matches regardless.
+const calibrationTolerance = 50
+
 // Class ranks a cluster by how much it departs from the baseline; lower is
 // more interesting, and the value doubles as the report ordering.
 type Class int
 
 const (
-	ClassBypass  Class = iota // status class improves on the baseline
-	ClassVariant              // same status class, different body
-	ClassDup                  // identical to the baseline
-	ClassNoise                // empty, non-improving artifact
+	ClassBypass     Class = iota // status class improves on the baseline
+	ClassVariant                 // same status class, different body
+	ClassDup                     // identical to the baseline
+	ClassNoise                   // empty, non-improving artifact
+	ClassCalibrated              // matches the negative control (-calibrate): the
+	// server's wildcard/soft-404 default, never a finding
 )
 
 // String returns the class name used in reports.
@@ -49,6 +61,8 @@ func (c Class) String() string {
 		return "DUP"
 	case ClassNoise:
 		return "NOISE"
+	case ClassCalibrated:
+		return "CALIBRATED"
 	}
 	return "UNKNOWN"
 }
@@ -96,6 +110,9 @@ type TargetReport struct {
 	BaselineSource string    `json:"baseline_source"`
 	BaselineStatus int       `json:"baseline_status"`
 	Clusters       []Cluster `json:"clusters"`
+	// CalibrationControls is the number of negative-control responses the run
+	// supplied (Addendum 6). Zero means calibration did not run.
+	CalibrationControls int `json:"calibration_controls,omitempty"`
 }
 
 // Report is the analysis of a whole findings database.
@@ -140,14 +157,15 @@ func Classify(targetURL string, rows []Row) TargetReport {
 		})
 	}
 
-	cores, source, baselineStatus := classifyRows(observed)
+	cores, source, baselineStatus, controls := classifyRows(observed)
 
 	tr := TargetReport{
-		TargetURL:      targetURL,
-		Rows:           len(rows),
-		BaselineSource: source,
-		BaselineStatus: baselineStatus,
-		Clusters:       make([]Cluster, 0, len(cores)),
+		TargetURL:           targetURL,
+		Rows:                len(rows),
+		BaselineSource:      source,
+		BaselineStatus:      baselineStatus,
+		CalibrationControls: controls,
+		Clusters:            make([]Cluster, 0, len(cores)),
 	}
 	for _, c := range cores {
 		cl := Cluster{
@@ -178,14 +196,15 @@ func ClassifyObservations(targetURL string, obs []Observation) TargetReport {
 		})
 	}
 
-	cores, source, baselineStatus := classifyRows(observed)
+	cores, source, baselineStatus, controls := classifyRows(observed)
 
 	tr := TargetReport{
-		TargetURL:      targetURL,
-		Rows:           len(obs),
-		BaselineSource: source,
-		BaselineStatus: baselineStatus,
-		Clusters:       make([]Cluster, 0, len(cores)),
+		TargetURL:           targetURL,
+		Rows:                len(obs),
+		BaselineSource:      source,
+		BaselineStatus:      baselineStatus,
+		CalibrationControls: controls,
+		Clusters:            make([]Cluster, 0, len(cores)),
 	}
 	for _, c := range cores {
 		cl := Cluster{
@@ -235,7 +254,7 @@ type clusterCore struct {
 // classifyRows is the single classification core: cluster by exact
 // fingerprint, choose a baseline, classify, order. Deterministic — no map
 // iteration reaches the output.
-func classifyRows(rows []obsRow) (clusters []clusterCore, baselineSource string, baselineStatus int) {
+func classifyRows(rows []obsRow) (clusters []clusterCore, baselineSource string, baselineStatus int, controls int) {
 	order := make([]string, 0, len(rows))
 	byKey := make(map[string]*clusterCore)
 	for _, r := range rows {
@@ -252,11 +271,18 @@ func classifyRows(rows []obsRow) (clusters []clusterCore, baselineSource string,
 	// Baseline selection.
 	baselineSet := make(map[string]bool)
 	var baseline []obsRow
+	// Negative controls (Addendum 6): the fingerprints of a `-calibrate` run's
+	// impossible-path probes.
+	var controlSet []Fingerprint
 	for _, r := range rows {
-		if r.module == BaselineDumbCheck {
+		switch r.module {
+		case BaselineDumbCheck:
 			baseline = append(baseline, r)
+		case CalibrationModule:
+			controlSet = append(controlSet, r.fp)
 		}
 	}
+	controls = len(controlSet)
 	if len(baseline) > 0 {
 		baselineSource = BaselineDumbCheck
 		for _, r := range baseline {
@@ -273,8 +299,10 @@ func classifyRows(rows []obsRow) (clusters []clusterCore, baselineSource string,
 
 	// Classification. Order matters: a fingerprint identical to the
 	// baseline is a DUP even if its status "improves" (e.g. a baseline
-	// 200 on an unprotected target); an empty-body 2xx is still a BYPASS,
-	// only empty non-improving responses are NOISE.
+	// 200 on an unprotected target); a cluster matching the negative
+	// control is CALIBRATED (the server's default page) and is never a
+	// BYPASS, however much its status class improves; an empty-body 2xx is
+	// still a BYPASS, only empty non-improving responses are NOISE.
 	emptyDigest := digest("")
 	out := make([]clusterCore, 0, len(order))
 	for _, k := range order {
@@ -283,6 +311,8 @@ func classifyRows(rows []obsRow) (clusters []clusterCore, baselineSource string,
 		switch {
 		case baselineSet[k]:
 			cl.class = ClassDup
+		case matchesControl(cl.fp, controlSet):
+			cl.class = ClassCalibrated
 		case statusImproves(cl.fp.Status, baselineStatus):
 			cl.class = ClassBypass
 		case cl.fp.Length == 0 && cl.fp.Digest == emptyDigest:
@@ -308,7 +338,31 @@ func classifyRows(rows []obsRow) (clusters []clusterCore, baselineSource string,
 		return a.fp.Key() < b.fp.Key()
 	})
 
-	return out, baselineSource, baselineStatus
+	return out, baselineSource, baselineStatus, controls
+}
+
+// matchesControl reports whether a fingerprint is one of the negative
+// controls: the target answered an impossible path with it, so it is the
+// server's default (wildcard / soft-404) response and not a finding.
+//
+// A control matches on the same status and media type, and then either an
+// identical body digest (an exact wildcard — stronger than unKover, which
+// compares size only) or a length within calibrationTolerance bytes (an
+// echoing soft-404 stamps the requested path, so the digest differs but the
+// page is the same).
+func matchesControl(fp Fingerprint, controls []Fingerprint) bool {
+	for _, c := range controls {
+		if fp.Status != c.Status || fp.MediaType != c.MediaType {
+			continue
+		}
+		if fp.Digest == c.Digest {
+			return true
+		}
+		if d := fp.Length - c.Length; d <= calibrationTolerance && d >= -calibrationTolerance {
+			return true
+		}
+	}
+	return false
 }
 
 // statusImproves reports whether status crosses from a denial class

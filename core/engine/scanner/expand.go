@@ -97,6 +97,16 @@ func (e *expandState) finishBaseline() {
 	e.baselineReqs = append(e.baselineReqs[:0], e.batchReqs...)
 }
 
+// finishControls folds the calibration module's batch (Addendum 6) into the
+// baseline, so a wildcard control shapes live classification exactly as the
+// baseline does: a cluster matching it can never be a BYPASS mid-scan, which is
+// what keeps -expand from acting on a soft-404. Called after the calibration
+// module, which runs right after dumb_check.
+func (e *expandState) finishControls() {
+	e.baselineObs = append(e.baselineObs, e.batchObs...)
+	e.baselineReqs = append(e.baselineReqs, e.batchReqs...)
+}
+
 // decide classifies the batch in flight (against the target's baseline) and
 // returns the requests to send next. Empty means "send nothing": unsupported
 // module, no confirmed hit in this batch, or no budget left.
