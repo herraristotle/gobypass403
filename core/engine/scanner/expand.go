@@ -32,9 +32,13 @@ import (
 // media type, body digest, length) plus the curl command, which is what makes
 // classifying a 6.5k-payload module affordable mid-scan.
 type expandState struct {
+	// enabled runs the expansion decision; collect only fingerprints responses
+	// (-expand does both, -adaptive only collects, for its triage evidence).
 	enabled bool
-	target  string
-	budget  int // requests left for this target, across all modules
+	collect bool
+
+	target string
+	budget int // requests left for this target, across all modules
 
 	// baseline is the target's dumb_check batch (dumb_check runs first:
 	// registry order, and validateModule prepends it).
@@ -46,8 +50,8 @@ type expandState struct {
 	batchReqs []payload.BypassPayload
 }
 
-func newExpandState(enabled bool) expandState {
-	return expandState{enabled: enabled, budget: expand.PerTarget}
+func newExpandState(collect, enabled bool) expandState {
+	return expandState{enabled: enabled, collect: collect, budget: expand.PerTarget}
 }
 
 // startTarget resets the baseline and the expansion budget when the scan moves

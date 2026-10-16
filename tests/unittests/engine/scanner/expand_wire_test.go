@@ -45,6 +45,7 @@ const wireModule = "http_methods"
 type wireBoard struct {
 	ln     net.Listener
 	bypass func(req string) bool
+	server string // Server header value; empty means the default below
 
 	mu       sync.Mutex
 	requests []string
@@ -52,11 +53,18 @@ type wireBoard struct {
 
 func startWireBoard(t *testing.T, bypass func(req string) bool) *wireBoard {
 	t.Helper()
+	return startWireBoardWithServer(t, "", bypass)
+}
+
+// startWireBoardWithServer is startWireBoard with a chosen Server header,
+// which is the fingerprint -adaptive reads.
+func startWireBoardWithServer(t *testing.T, server string, bypass func(req string) bool) *wireBoard {
+	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	b := &wireBoard{ln: ln, bypass: bypass}
+	b := &wireBoard{ln: ln, bypass: bypass, server: server}
 	go b.serve()
 	t.Cleanup(func() { _ = ln.Close() })
 	return b
@@ -126,9 +134,13 @@ func (b *wireBoard) handle(conn net.Conn) {
 		body = "<html><head><title>dashboard</title></head><body>200 bypassed</body></html>"
 		status = "200 OK"
 	}
+	server := b.server
+	if server == "" {
+		server = "wireboard/1.0"
+	}
 	_, _ = fmt.Fprintf(conn,
-		"HTTP/1.1 %s\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: %d\r\nServer: wireboard/1.0\r\nConnection: close\r\n\r\n%s",
-		status, len(body), body)
+		"HTTP/1.1 %s\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: %d\r\nServer: %s\r\nConnection: close\r\n\r\n%s",
+		status, len(body), server, body)
 }
 
 var (

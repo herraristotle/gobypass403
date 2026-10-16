@@ -16,6 +16,7 @@ import (
 
 	"fortio.org/progressbar"
 	"github.com/slicingmelon/go-rawurlparser"
+	"github.com/slicingmelon/gobypass403/core/engine/adaptive"
 	"github.com/slicingmelon/gobypass403/core/engine/analysis"
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
 	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
@@ -102,7 +103,7 @@ func (s *Scanner) RunAllBypasses(targetURL string) int {
 	// One state per target run (Addendum 5 Phase D): the seen-RawURI history
 	// and the expansion bookkeeping belong to this target, not to the scanner,
 	// so another target can be scanned at the same time.
-	ts := newTargetState(s.scannerOpts.Expand)
+	ts := newTargetState(s.scannerOpts.Expand, s.scannerOpts.Adaptive)
 
 	// Addendum 5 Phase D: with -resume the checkpoint names the (target,
 	// module) pairs that already finished, and each pair is made durable as
@@ -110,28 +111,109 @@ func (s *Scanner) RunAllBypasses(targetURL string) int {
 	// was running. Both calls are nil-safe, so a plain run pays nothing.
 	progress := s.scannerOpts.Progress
 
-	modules := strings.Split(s.scannerOpts.BypassModule, ",")
+	modules := splitModules(s.scannerOpts.BypassModule)
+
+	// Addendum 5 Phase C: with -adaptive the baseline module runs first (its
+	// response is this target's fingerprint, no extra request) and the modules
+	// the fingerprint promotes run ahead of the rest.
+	if ts.adaptive.enabled {
+		baseline, rest := splitBaseline(modules)
+		if baseline == "" {
+			GB403Logger.Warning().Msgf(
+				"-adaptive: %s is not in the module list, keeping the default order for %s\n",
+				analysis.BaselineDumbCheck, targetURL)
+		} else {
+			ts.adaptive.fingerprintRequest()
+			totalFindings += s.runModule(baseline, targetURL, ts, progress)
+			if ts.adaptive.haveBaseline {
+				modules = ts.adaptive.order(rest)
+			} else {
+				GB403Logger.Warning().Msgf(
+					"-adaptive: no baseline response for %s, keeping the default order\n", targetURL)
+				modules = rest
+			}
+		}
+	}
+
 	for _, module := range modules {
-		module = strings.TrimSpace(module)
-		if module == "" {
-			continue
-		}
+		totalFindings += s.runModule(module, targetURL, ts, progress)
+	}
 
-		if progress.Has(targetURL, module) {
-			GB403Logger.Verbose().Msgf("Skipping %s for %s (already scanned)\n", module, targetURL)
-			continue
-		}
-
-		findings := s.runBypassModule(module, targetURL, ts)
-		totalFindings += findings
-
-		progress.Mark(targetURL, module)
-		if err := progress.Save(); err != nil {
-			GB403Logger.Warning().Msgf("Could not update the resume checkpoint: %v\n", err)
+	// Addendum 5 Phase C: the triage pass decides whether the deep families
+	// have been earned (403 baseline plus a novel cluster). They run once per
+	// target, after everything else.
+	if ts.adaptive.enabled {
+		if deep := s.escalation(targetURL, modules, ts); len(deep) > 0 {
+			GB403Logger.Info().Msgf("-adaptive: escalating %s with the deep families: %s\n",
+				targetURL, strings.Join(deep, ", "))
+			for _, module := range deep {
+				totalFindings += s.runModule(module, targetURL, ts, progress)
+			}
 		}
 	}
 
 	return totalFindings
+}
+
+// runModule runs one module for a target and returns its findings. The resume
+// checkpoint skips a module that already completed and records this one as
+// soon as it is done; an adaptive run also keeps the module's observations as
+// escalation evidence (a skipped module produced none).
+func (s *Scanner) runModule(module, targetURL string, ts *targetState, progress *Progress) int {
+	if progress.Has(targetURL, module) {
+		GB403Logger.Verbose().Msgf("Skipping %s for %s (already scanned)\n", module, targetURL)
+		return 0
+	}
+
+	findings := s.runBypassModule(module, targetURL, ts)
+
+	if ts.adaptive.enabled {
+		ts.adaptive.remember(ts.expand.batchObs)
+	}
+
+	progress.Mark(targetURL, module)
+	if err := progress.Save(); err != nil {
+		GB403Logger.Warning().Msgf("Could not update the resume checkpoint: %v\n", err)
+	}
+
+	return findings
+}
+
+// escalation returns the deep families this target earned, empty when it did
+// not: the baseline must be a captured 403 and the triage observations must
+// contain a BYPASS cluster. Modules already scheduled are never repeated.
+func (s *Scanner) escalation(targetURL string, scanned []string, ts *targetState) []string {
+	if !ts.adaptive.haveBaseline || len(ts.adaptive.obs) == 0 {
+		return nil
+	}
+	if !adaptive.ShouldEscalate(analysis.ClassifyObservations(targetURL, ts.adaptive.obs)) {
+		return nil
+	}
+	return adaptive.DeepModulesExcept(scanned)
+}
+
+// splitModules normalizes the comma-separated module list.
+func splitModules(bypassModule string) []string {
+	modules := strings.Split(bypassModule, ",")
+	out := make([]string, 0, len(modules))
+	for _, module := range modules {
+		if module = strings.TrimSpace(module); module != "" {
+			out = append(out, module)
+		}
+	}
+	return out
+}
+
+// splitBaseline removes the baseline module from the list, returning it and the
+// remaining modules in order, so an adaptive run can send it first whatever
+// position the user's -m put it in.
+func splitBaseline(modules []string) (string, []string) {
+	i := slices.Index(modules, analysis.BaselineDumbCheck)
+	if i < 0 {
+		return "", modules
+	}
+	baseline := modules[i]
+	return baseline, slices.Delete(slices.Clone(modules), i, i+1)
 }
 
 // effectiveTargetURL rebuilds the generation URL from an imported request
@@ -155,7 +237,7 @@ func effectiveTargetURL(targetURL string, pr *rawhttp.ParsedRequest) string {
 // findings. The module gets a fresh target state: a one-off call is a target of
 // its own, so it must not inherit or leave behind another target's history.
 func (s *Scanner) RunBypassModule(bypassModule string, targetURL string) int {
-	return s.runBypassModule(bypassModule, targetURL, newTargetState(s.scannerOpts.Expand))
+	return s.runBypassModule(bypassModule, targetURL, newTargetState(s.scannerOpts.Expand, s.scannerOpts.Adaptive))
 }
 
 // runBypassModule is RunBypassModule over a caller-owned target state, which is
@@ -214,12 +296,13 @@ func (s *Scanner) runBypassModule(bypassModule string, targetURL string, ts *tar
 		return 0
 	}
 
-	// -expand: fingerprint every response this batch sends, even the ones the
+	// -expand fingerprints every response this batch sends, even the ones the
 	// display filters drop, so the target's baseline is available and a
-	// confirmed hit is recognisable without -mc.
+	// confirmed hit is recognisable without -mc. -adaptive collects the same
+	// observations as its escalation evidence (collect without enabled).
 	var expandIdx map[string]int
 	expandBaseURL := ""
-	if ts.expand.enabled {
+	if ts.expand.collect {
 		ts.expand.startTarget(targetURL)
 		ts.expand.startBatch()
 		expandIdx = make(map[string]int, totalJobs)
@@ -316,10 +399,25 @@ func (s *Scanner) scanBatch(worker *BypassEngagement, jobs []payload.BypassPaylo
 		bar.WriteAbove(msg)
 
 		// -expand: observe before the display filters drop the response
-		// (a -mc 200 run must still see the dumb_check denial).
-		if ts.expand.enabled && jobIndex != nil {
+		// (a -mc 200 run must still see the dumb_check denial). -adaptive
+		// collects the same observations for its escalation decision.
+		if ts.expand.collect && jobIndex != nil {
 			if idx, ok := jobIndex[string(response.DebugToken)]; ok {
 				ts.expand.observe(response, jobs[idx])
+			}
+		}
+
+		// -adaptive: the first response of the baseline module is this
+		// target's fingerprint (status, Server header, marker headers and
+		// cookies), captured before the display filters drop it. No extra
+		// request is sent for it.
+		if ts.adaptive.enabled && ts.adaptive.capture && !ts.adaptive.haveBaseline && jobIndex != nil {
+			if _, ok := jobIndex[string(response.DebugToken)]; ok {
+				ts.adaptive.captureFingerprint(
+					response.StatusCode,
+					string(response.ServerInfo),
+					strings.Split(string(response.ResponseHeaders), "\n"),
+				)
 			}
 		}
 

@@ -20,15 +20,17 @@ import (
 // at the same time. One target is still scanned by one goroutine, so no lock is
 // needed here; the isolation, not the concurrency inside a target, is the point.
 type targetState struct {
-	seen   map[string]string // rawURI -> bypassModule that sent it first
-	expand expandState
+	seen     map[string]string // rawURI -> bypassModule that sent it first
+	expand   expandState
+	adaptive adaptiveState
 }
 
 // newTargetState returns the state for one target run.
-func newTargetState(expandEnabled bool) *targetState {
+func newTargetState(expandEnabled, adaptiveEnabled bool) *targetState {
 	return &targetState{
-		seen:   make(map[string]string),
-		expand: newExpandState(expandEnabled),
+		seen:     make(map[string]string),
+		expand:   newExpandState(expandEnabled || adaptiveEnabled, expandEnabled),
+		adaptive: adaptiveState{enabled: adaptiveEnabled},
 	}
 }
 

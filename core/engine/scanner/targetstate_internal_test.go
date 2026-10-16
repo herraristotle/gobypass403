@@ -12,6 +12,7 @@ package scanner
 import (
 	"testing"
 
+	"github.com/slicingmelon/gobypass403/core/engine/analysis"
 	"github.com/slicingmelon/gobypass403/core/engine/expand"
 	"github.com/slicingmelon/gobypass403/core/engine/payload"
 )
@@ -19,8 +20,8 @@ import (
 func TestTargetStatesDoNotShareSeenPayloads(t *testing.T) {
 	shape := []payload.BypassPayload{{RawURI: "/admin", PayloadToken: "t1"}}
 
-	a := newTargetState(false)
-	b := newTargetState(false)
+	a := newTargetState(false, false)
+	b := newTargetState(false, false)
 
 	if got := len(a.filterUniqueBypassPayloads(shape, "path_prefix")); got != 1 {
 		t.Fatalf("first target kept %d payloads, want 1 (nothing seen before)", got)
@@ -38,8 +39,8 @@ func TestTargetStatesDoNotShareSeenPayloads(t *testing.T) {
 }
 
 func TestTargetStatesKeepTheirOwnExpansionState(t *testing.T) {
-	a := newTargetState(true)
-	b := newTargetState(true)
+	a := newTargetState(true, false)
+	b := newTargetState(true, false)
 
 	a.expand.startTarget("https://a.example/admin")
 	a.expand.budget = 3
@@ -57,11 +58,45 @@ func TestTargetStatesKeepTheirOwnExpansionState(t *testing.T) {
 func TestTargetStateLeavesUnfilteredModulesAlone(t *testing.T) {
 	shape := []payload.BypassPayload{{RawURI: "/admin", PayloadToken: "t1"}}
 
-	ts := newTargetState(false)
+	ts := newTargetState(false, false)
 	if got := len(ts.filterUniqueBypassPayloads(shape, "http_methods")); got != 1 {
 		t.Fatalf("unfiltered module kept %d payloads, want 1", got)
 	}
 	if len(ts.seen) != 0 {
 		t.Errorf("unfiltered module wrote %d entries into the seen map, want 0", len(ts.seen))
+	}
+}
+
+// Task C3 (Addendum 5, Phase C): the fingerprint and the triage evidence are
+// per target too, so -tw > 1 cannot let one target's Server header or clusters
+// decide another target's module order.
+func TestTargetStatesKeepTheirOwnAdaptiveState(t *testing.T) {
+	a := newTargetState(false, true)
+	b := newTargetState(false, true)
+
+	a.adaptive.fingerprintRequest()
+	if !a.adaptive.captureFingerprint(403, "cloudflare", []string{"Server: cloudflare"}) {
+		t.Fatal("the first baseline response was not captured")
+	}
+	a.adaptive.remember([]analysis.Observation{{Module: "dumb_check"}})
+
+	if b.adaptive.haveBaseline {
+		t.Error("second target inherited the first target's baseline fingerprint")
+	}
+	if len(b.adaptive.obs) != 0 {
+		t.Errorf("second target inherited %d observations", len(b.adaptive.obs))
+	}
+	if got := b.adaptive.order([]string{"http_methods", "headers_ip"}); got[0] != "http_methods" {
+		t.Errorf("second target was reordered without a baseline: %v", got)
+	}
+
+	// An adaptive-off state never captures or reorders, even mid-run.
+	off := newTargetState(false, false)
+	off.adaptive.fingerprintRequest()
+	if off.adaptive.captureFingerprint(403, "cloudflare", nil) {
+		t.Error("a state with -adaptive off captured a fingerprint")
+	}
+	if got := off.adaptive.order([]string{"b", "a"}); got[0] != "b" {
+		t.Errorf("a state with -adaptive off reordered: %v", got)
 	}
 }

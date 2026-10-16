@@ -50,6 +50,7 @@ type ScannerOpts struct {
 	ParsedRequest             *rawhttp.ParsedRequest // Base request imported via --request-file (issue #2, phase 2)
 	ReconCache                *recon.ReconCache
 	Expand                    bool // -expand: derive a bounded depth-1 batch around a confirmed hit (Addendum 5 Phase B)
+	Adaptive                  bool // -adaptive: fingerprint the baseline, promote matching modules, escalate deep families (Addendum 5 Phase C)
 	MaxReqs                   int  // -max-reqs: hard stop after this many requests, 0 = unlimited (Addendum 5 Phase D)
 	// Progress is the resume checkpoint (Addendum 5 Phase D). Non-nil only for
 	// -resume runs: completed (target, module) pairs are skipped and every newly

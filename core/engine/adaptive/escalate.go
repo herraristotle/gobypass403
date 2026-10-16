@@ -38,6 +38,19 @@ func DeepModules() []string {
 	return slices.Clone(deepModules)
 }
 
+// DeepModulesExcept returns the deep families that scanned does not already
+// name, in registry order: what an escalation still has to run (with -m all,
+// nothing is left).
+func DeepModulesExcept(scanned []string) []string {
+	out := make([]string, 0, len(deepModules))
+	for _, m := range deepModules {
+		if !slices.Contains(scanned, m) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
 // ShouldEscalate reports whether one target has earned the deep pass: its
 // baseline is a confirmed 403 and at least one triage cluster improved on it
 // (ClassBypass). A non-403 baseline, no clusters, or only VARIANT/DUP/NOISE
