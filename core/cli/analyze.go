@@ -35,6 +35,10 @@ func (r *Runner) handleAnalyze() error {
 	fmt.Printf("Findings database: %s\n\n", opts.AnalyzeDB)
 	fmt.Print(report.Text())
 
+	if opts.WarnWildcard {
+		printWildcardHints(report)
+	}
+
 	if opts.AnalyzeJSON == "" {
 		return nil
 	}
@@ -49,4 +53,21 @@ func (r *Runner) handleAnalyze() error {
 	fmt.Printf("\nJSON report written to: %s\n", opts.AnalyzeJSON)
 
 	return nil
+}
+
+// printWildcardHints names the catch-all-shaped clusters of an offline report
+// (Addendum 7). Same rule as the live run -- WildcardHints over the classified
+// report -- so both paths say the same thing about the same database, and the
+// hint stays a hint: it names a shape and the remedy, it suppresses nothing.
+func printWildcardHints(report analysis.Report) {
+	hints := analysis.WildcardHints(report)
+	if len(hints) == 0 {
+		return
+	}
+
+	fmt.Println()
+	fmt.Println("Wildcard hints (the shape of a catch-all, not a finding - rerun the scan with -calibrate to confirm):")
+	for _, h := range hints {
+		fmt.Printf("  %s\n    %s\n", h.TargetURL, h)
+	}
 }
