@@ -179,6 +179,8 @@ Usage:
         Enable pprof profiler (Default: false)
   -scan-profile
         Scan scope preset: full (all bypass modules) or triage (high-signal subset for first-pass triage; explicit -m wins, -em subtracts) (Default: full)
+  -expand
+        Expand around a confirmed hit: derive a bounded depth-1 batch from the request that worked (off by default; 256 extra requests per hit, 1024 per target) (Default: false)
   -update-payloads
         Update payload files to latest version (Default: false)
 ```
@@ -220,6 +222,50 @@ the preview are treated as identical; clustering is exact-digest only (no
 fuzzy matching); and `BYPASS` means "the response changed", not "this is
 exploitable" — every cluster prints its ready-to-run `curl` command so you
 can confirm by hand.
+
+## Feedback Expansion: expand around a confirmed hit
+
+A scan is normally one-way: each module sends its payload set and reports what
+came back. `-expand` adds one bounded follow-up pass. When a module's batch
+finishes, the same classifier that powers `-analyze` looks at that batch, and
+if something actually bypassed, a **depth-1** batch of variations around *that
+exact request* is derived and scanned through the normal pipeline (same
+request pool, same filters, same findings table).
+
+```bash
+# find bypasses, then feel around the first one that works
+gobypass403 -u "https://go-test-webapp.com/admin" -mc "200" -expand
+```
+
+Only three families expand; every other module reports itself unsupported and
+sends nothing extra:
+
+| Confirmed hit | Derived variations |
+|---|---|
+| path modules (`path_prefix`, `mid_paths`, `end_paths`, `char_encode`, `case_substitution`, …) | the module's own generator, re-applied to the confirmed request-target |
+| `http_methods`, `headers_method` | case permutations and a trailing-space twin of the method that worked |
+| `headers_ip` | other notations and neighbours of the IP value that worked |
+
+Guardrails:
+
+- **Opt-in.** Without `-expand` there is no observation collection, no
+  classification and no extra request — a default run is unchanged.
+- **Capped.** At most **256** derived requests per confirmed hit and **1024**
+  per target; only the **top** `BYPASS` cluster of a batch is expanded.
+- **Depth 1.** Expansion responses are never re-classified, so a derived hit
+  cannot start another round and the batch cannot grow recursively.
+- **Marked.** Expansion rows keep their real module name (the findings table
+  still groups them) and their `curl` command ends in ` # expanded` — a shell
+  comment, so a copy-pasted PoC still runs.
+- **No repeats.** A shape the batch already sent is never re-sent (e.g.
+  `http_methods` tests both `acl` and `ACL` itself, so a derived `acl` for a
+  confirmed `ACL` is dropped).
+
+**Honest limits.** A hit is judged by the same heuristic status-class rule as
+`-analyze`: it means "this response differs from the baseline", not "this is
+exploitable". Matching is exact-digest only (no fuzzy matching), expansion is
+one round deep, and many modules have no mutator at all (most header families,
+`param_manipulation`, `user_agent`, …), so they expand nothing.
 
 ## Standard WAF 403/401 Bypass
 
