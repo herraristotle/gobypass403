@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: read
+
 jobs:
   build-linux:
     name: Build Static Linux Binary
@@ -17,12 +20,12 @@ jobs:
         run: apk add --no-cache build-base git curl pkgconf sqlite-dev musl-dev
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: 1.24.1
+          go-version: 1.27.2
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configure Git Safe Directory
         run: git config --global --add safe.directory /__w/gobypass403/gobypass403
@@ -44,7 +47,7 @@ jobs:
             -o dist/gobypass403_${VERSION}_linux_amd64 ./cmd/gobypass403
 
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gobypass403-binary-linux-amd64
           path: dist/*
@@ -64,7 +67,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Extract version from Git tag
         run: |
@@ -73,9 +76,9 @@ jobs:
         shell: bash
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: 1.24.1
+          go-version: 1.27.2
 
       - name: Build macOS & Windows binaries
         shell: bash
@@ -98,7 +101,7 @@ jobs:
           fi
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gobypass403-binary-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/*
@@ -109,7 +112,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Extract version from Git tag
         run: |
@@ -118,9 +121,9 @@ jobs:
         shell: bash
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: 1.24.1
+          go-version: 1.27.2
 
       - name: Install system dependencies
         run: |
@@ -143,8 +146,9 @@ jobs:
             ./cmd/gobypass403
 
       - name: Build Debian package
+        env:
+          VERSION: ${{ env.VERSION }}
         run: |
-          VERSION="${{ env.VERSION }}"
           DEB_DIR="dist/deb/gobypass403_${VERSION}_amd64"
           mkdir -p "${DEB_DIR}/DEBIAN"
           mkdir -p "${DEB_DIR}/usr/bin"
@@ -182,7 +186,7 @@ jobs:
           dpkg-deb --build --root-owner-group "${DEB_DIR}" "dist/gobypass403_${VERSION}_amd64.deb"
 
       - name: Upload Debian package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gobypass403-deb-amd64
           path: dist/gobypass403_*.deb
@@ -192,12 +196,14 @@ jobs:
     name: Create Release
     needs: [build-linux, build-other, build-deb]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           pattern: gobypass403-*
@@ -216,7 +222,7 @@ jobs:
           fi
 
       - name: Create Draft Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: dist/*
           draft: true
