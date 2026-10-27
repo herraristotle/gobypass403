@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+
 jobs:
   build-linux:
     name: Build Static Linux Binary
@@ -221,11 +224,17 @@ jobs:
             echo "body=Release for ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create Draft Release
+      - name: Generate SHA256 checksums
+        run: |
+          cd dist
+          ls -A | grep -v '^SHA256SUMS\.txt$' | xargs sha256sum > SHA256SUMS.txt
+
+      - name: Create Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: dist/*
-          draft: true
+          draft: false
+          fail_on_unmatched_files: true
           body: ${{ steps.changelog.outputs.body }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
