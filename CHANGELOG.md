@@ -1,4 +1,4 @@
-# Unreleased
+# 0.8.9
 
 - **Fixed the results table's row order for tied rows** — `PrintResultsTableFromDB` groups rows by `(module, status, length)` and prints at most five per group, but its `ORDER BY` stopped at the length key. Rows tied on all three then fell back to SQLite's row order — insertion order, which varies with `-cr` — so two runs of the *same* scan sampled different rows, and because the curl lines differ in width the rendered box changed with them (reproduced on a loopback board: 515 tied rows, five shown, a different five each run). The query now ends `curl_cmd ASC, id ASC`, so the sampled five are content-derived and the printed table is reproducible from its `results.db` whatever order the rows were written. Rows are never reordered across groups, so nothing else about the table changes; it removes the exception the byte-identity checks used to carry.
 
