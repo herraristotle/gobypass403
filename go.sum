@@ -67,8 +67,8 @@ github.com/gookit/color v1.4.2/go.mod h1:fqRyamkC1W8uxl+lxCQxOT09l/vYfZ+QeiX3rKQ
 github.com/gookit/color v1.5.0/go.mod h1:43aQb+Zerm/BWh2GnrgOQm7ffz7tvQXEKV6BFMl7wAo=
 github.com/gookit/color v1.6.0 h1:JjJXBTk1ETNyqyilJhkTXJYYigHG24TM9Xa2M1xAhRA=
 github.com/gookit/color v1.6.0/go.mod h1:9ACFc7/1IpHGBW8RwuDm/0YEnhg3dwwXpoMsmtyHfjs=
-github.com/herraristotle/fasthttp v1.64.0-gobypass403.2 h1:/esGye1d/7MFq+BAMDDqWI3JcxFpF9iCXgYFkOLQji0=
-github.com/herraristotle/fasthttp v1.64.0-gobypass403.2/go.mod h1:dGmFxwkWXSK0NbOSJuF7AMVzU+lkHz0wQVvVITv2UQA=
+github.com/herraristotle/fasthttp v1.64.0-gobypass403.3 h1:bXKQIZfnkq4aBg8n0Z8IO94oLux5ljHWtFsDhd3gqFA=
+github.com/herraristotle/fasthttp v1.64.0-gobypass403.3/go.mod h1:cjBKshN34DuOiTHTnTgESvKxPygK9/sVITes4IIkfCc=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
 github.com/klauspost/compress v1.18.0/go.mod h1:2Pp+KzxcywXVXMr50+X0Q/Lsb43OQHYWRCY2AiWywWQ=
 github.com/klauspost/cpuid/v2 v2.0.9/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=

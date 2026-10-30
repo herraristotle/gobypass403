@@ -10,8 +10,8 @@ import (
 	"github.com/herraristotle/gobypass403/core/engine/payload"
 	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
 	GB403ErrorHandler "github.com/herraristotle/gobypass403/core/utils/error"
-	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttputil"
+	"github.com/herraristotle/fasthttp"
+	"github.com/herraristotle/fasthttp/fasthttputil"
 )
 
 // setupInMemoryServer starts a raw canned-response server (200 "OK") on an

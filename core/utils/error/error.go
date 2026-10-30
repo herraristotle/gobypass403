@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/ristretto/v2"
-	"github.com/valyala/fasthttp"
+	"github.com/herraristotle/fasthttp"
 )
 
 const (

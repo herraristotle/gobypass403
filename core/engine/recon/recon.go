@@ -17,7 +17,7 @@ import (
 
 	"github.com/slicingmelon/go-rawurlparser"
 	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
-	"github.com/valyala/fasthttp"
+	"github.com/herraristotle/fasthttp"
 )
 
 /*

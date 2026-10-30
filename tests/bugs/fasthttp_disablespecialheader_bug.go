@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/slicingmelon/go-bytesutil/bytesutil"
-	"github.com/valyala/fasthttp"
+	"github.com/herraristotle/fasthttp"
 )
 
 var (

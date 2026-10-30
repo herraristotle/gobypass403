@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valyala/fasthttp/fasthttputil"
+	"github.com/herraristotle/fasthttp/fasthttputil"
 )
 
 // rawBenchResp builds a canned HTTP/1.1 response with an exact Content-Length.

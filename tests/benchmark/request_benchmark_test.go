@@ -8,7 +8,7 @@ import (
 	"github.com/herraristotle/gobypass403/core/engine/payload"
 	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
 	"github.com/herraristotle/gobypass403/core/utils/helpers"
-	"github.com/valyala/fasthttp"
+	"github.com/herraristotle/fasthttp"
 )
 
 // 4435408	       280.9 ns/op	       0 B/op	       0 allocs/op

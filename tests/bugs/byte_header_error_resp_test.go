@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttputil"
+	"github.com/herraristotle/fasthttp"
+	"github.com/herraristotle/fasthttp/fasthttputil"
 )
 
 func TestServerClosedConnectionBeforeReturningTheFirstResponseByte1(t *testing.T) {

@@ -17,7 +17,7 @@ import (
 	"github.com/herraristotle/gobypass403/core/engine/payload"
 	GB403ErrorHandler "github.com/herraristotle/gobypass403/core/utils/error"
 	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
-	"github.com/valyala/fasthttp"
+	"github.com/herraristotle/fasthttp"
 )
 
 var (

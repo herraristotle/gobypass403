@@ -14,7 +14,7 @@ import (
 
 	"github.com/likexian/doh"
 	"github.com/likexian/doh/dns"
-	"github.com/valyala/fasthttp"
+	"github.com/herraristotle/fasthttp"
 )
 
 var (

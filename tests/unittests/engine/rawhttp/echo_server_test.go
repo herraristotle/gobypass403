@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valyala/fasthttp/fasthttputil"
+	"github.com/herraristotle/fasthttp/fasthttputil"
 )
 
 // rawRequest is a minimal parse of one HTTP/1.x request read off the wire.

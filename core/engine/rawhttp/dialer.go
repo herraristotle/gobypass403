@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttpproxy"
+	"github.com/herraristotle/fasthttp"
+	"github.com/herraristotle/fasthttp/fasthttpproxy"
 )
 
 var (

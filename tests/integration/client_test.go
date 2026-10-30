@@ -8,8 +8,8 @@ import (
 
 	"github.com/herraristotle/gobypass403/core/engine/payload"
 	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
-	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttputil"
+	"github.com/herraristotle/fasthttp"
+	"github.com/herraristotle/fasthttp/fasthttputil"
 )
 
 func TestConsecutiveFailures(t *testing.T) {

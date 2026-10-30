@@ -9,8 +9,8 @@ import (
 	"github.com/herraristotle/gobypass403/core/engine/payload"
 	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
 	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
-	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttputil"
+	"github.com/herraristotle/fasthttp"
+	"github.com/herraristotle/fasthttp/fasthttputil"
 )
 
 func TestClient301RedirectInmemory(t *testing.T) {

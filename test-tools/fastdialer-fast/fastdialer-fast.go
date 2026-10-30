@@ -14,7 +14,7 @@ import (
 
 	"github.com/herraristotle/gobypass403/core/engine/recon"
 	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
-	"github.com/valyala/fasthttp"
+	"github.com/herraristotle/fasthttp"
 )
 
 type FastDialer struct {

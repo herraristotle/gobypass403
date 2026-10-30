@@ -14,8 +14,8 @@ import (
 	GB403ErrorHandler "github.com/herraristotle/gobypass403/core/utils/error"
 	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 	"github.com/stretchr/testify/assert"
-	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttputil"
+	"github.com/herraristotle/fasthttp"
+	"github.com/herraristotle/fasthttp/fasthttputil"
 )
 
 func TestRetryOnEOF(t *testing.T) {

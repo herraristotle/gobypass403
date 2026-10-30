@@ -11,6 +11,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/dgraph-io/ristretto/v2 v2.2.0
 	github.com/golang/snappy v1.0.0
+	github.com/herraristotle/fasthttp v1.64.0-gobypass403.3
 	github.com/klauspost/compress v1.18.0
 	github.com/likexian/doh v0.7.1
 	github.com/mattn/go-sqlite3 v1.14.32
@@ -21,7 +22,6 @@ require (
 	github.com/slicingmelon/go-bytesutil v0.0.2
 	github.com/slicingmelon/go-rawurlparser v0.3.1
 	github.com/stretchr/testify v1.11.1
-	github.com/valyala/fasthttp v1.64.0
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	golang.design/x/clipboard v0.7.1
 	golang.org/x/text v0.30.0
@@ -68,5 +68,3 @@ require (
 	golang.org/x/term v0.36.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/valyala/fasthttp => github.com/herraristotle/fasthttp v1.64.0-gobypass403.2
