@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 // TestUserAgentGeneration pins the user_agent module (addendum 3, Phase C):

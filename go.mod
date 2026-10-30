@@ -1,4 +1,4 @@
-module github.com/slicingmelon/gobypass403
+module github.com/herraristotle/gobypass403
 
 go 1.24.1
 
@@ -10,7 +10,6 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.6
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/dgraph-io/ristretto/v2 v2.2.0
-	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/golang/snappy v1.0.0
 	github.com/klauspost/compress v1.18.0
 	github.com/likexian/doh v0.7.1
@@ -43,7 +42,6 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
-	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/gookit/color v1.6.0 // indirect
 	github.com/likexian/gokit v0.25.15 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
@@ -71,4 +69,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/valyala/fasthttp => ./pkg/fasthttp-client-1.64.0
+replace github.com/valyala/fasthttp => github.com/herraristotle/fasthttp v1.64.0-gobypass403.2

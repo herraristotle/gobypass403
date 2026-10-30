@@ -17,7 +17,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pterm/pterm"
 	"github.com/slicingmelon/go-bytesutil/bytesutil"
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
 )
 
 // to optimize

@@ -16,12 +16,12 @@ import (
 
 	"fortio.org/progressbar"
 	"github.com/slicingmelon/go-rawurlparser"
-	"github.com/slicingmelon/gobypass403/core/engine/adaptive"
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
-	"github.com/slicingmelon/gobypass403/core/utils/helpers"
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
+	"github.com/herraristotle/gobypass403/core/engine/adaptive"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
+	"github.com/herraristotle/gobypass403/core/utils/helpers"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 )
 
 // IsValidBypassModule checks if a module is valid

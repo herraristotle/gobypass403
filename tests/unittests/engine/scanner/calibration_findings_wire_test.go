@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
-	"github.com/slicingmelon/gobypass403/core/engine/scanner"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/scanner"
 )
 
 // wireRowCount counts the rows this target has in the shared findings DB,

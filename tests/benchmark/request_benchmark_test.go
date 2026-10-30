@@ -5,9 +5,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
-	"github.com/slicingmelon/gobypass403/core/utils/helpers"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
+	"github.com/herraristotle/gobypass403/core/utils/helpers"
 	"github.com/valyala/fasthttp"
 )
 

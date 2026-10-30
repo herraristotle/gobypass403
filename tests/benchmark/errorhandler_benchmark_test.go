@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	GB403ErrorHandler "github.com/slicingmelon/gobypass403/core/utils/error"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	GB403ErrorHandler "github.com/herraristotle/gobypass403/core/utils/error"
 )
 
 func BenchmarkErrorHandlerNew(b *testing.B) {

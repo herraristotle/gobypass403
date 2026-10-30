@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
 )
 
 // handleAnalyze runs the offline analyzer and returns. The text report is

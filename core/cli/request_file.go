@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
 )
 
 // parseRawRequest parses a raw HTTP request captured from a proxy or editor

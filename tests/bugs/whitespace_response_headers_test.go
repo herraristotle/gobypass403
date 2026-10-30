@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/slicingmelon/go-rawurlparser"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
-	GB403ErrorHandler "github.com/slicingmelon/gobypass403/core/utils/error"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
+	GB403ErrorHandler "github.com/herraristotle/gobypass403/core/utils/error"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttputil"
 )

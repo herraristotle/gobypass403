@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
 )
 
 // deepModules is the triage preset's complement (decision C.5): the families

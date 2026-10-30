@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
 )
 
 // buildRaw builds a raw request for the payload and returns it as a string.

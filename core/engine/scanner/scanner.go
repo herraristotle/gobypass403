@@ -11,10 +11,10 @@ import (
 	"sync/atomic"
 
 	"github.com/slicingmelon/go-rawurlparser"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
-	"github.com/slicingmelon/gobypass403/core/engine/recon"
-	GB403ErrorHandler "github.com/slicingmelon/gobypass403/core/utils/error"
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
+	"github.com/herraristotle/gobypass403/core/engine/recon"
+	GB403ErrorHandler "github.com/herraristotle/gobypass403/core/utils/error"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 )
 
 type ScannerOpts struct {

@@ -13,7 +13,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
 )
 
 func TestCalibrateInjectsControlAfterBaseline(t *testing.T) {

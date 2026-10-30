@@ -15,8 +15,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
-	"github.com/slicingmelon/gobypass403/core/engine/scanner"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/scanner"
 )
 
 // soft404Accept answers every path except the scanned target with a 200, and

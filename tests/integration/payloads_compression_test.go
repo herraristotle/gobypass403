@@ -14,7 +14,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/pierrec/lz4/v4"
 	"github.com/slicingmelon/go-bytesutil/bytesutil"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 	"github.com/vmihailenco/msgpack/v5"
 )
 

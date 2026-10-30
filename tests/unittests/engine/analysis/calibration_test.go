@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
 )
 
 // compact builds a row with an explicit media type (the shared row() helper

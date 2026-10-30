@@ -17,7 +17,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
 )
 
 // fixtureDDL mirrors the columns Analyze reads; the full-schema case is

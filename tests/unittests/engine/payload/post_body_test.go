@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
 )
 
 // collectAndSendPayloads sends generated payloads to a raw TCP test server and

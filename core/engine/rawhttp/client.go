@@ -14,9 +14,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	GB403ErrorHandler "github.com/slicingmelon/gobypass403/core/utils/error"
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	GB403ErrorHandler "github.com/herraristotle/gobypass403/core/utils/error"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 	"github.com/valyala/fasthttp"
 )
 
@@ -402,6 +402,10 @@ func (c *HTTPClient) DoRequest(req *fasthttp.Request, resp *fasthttp.Response, b
 	if c.throttler.IsThrottlerActive() {
 		c.throttler.ThrottleRequest()
 	}
+
+	// Accept control bytes in response header values: a front-end that answers
+	// with one must still be observable, and the raw value is evidence.
+	resp.Header.EnableLenientHeaderValues()
 
 	// Initial request
 	start := time.Now()

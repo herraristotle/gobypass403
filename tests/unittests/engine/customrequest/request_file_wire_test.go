@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
-	"github.com/slicingmelon/gobypass403/core/engine/scanner"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
+	"github.com/herraristotle/gobypass403/core/engine/scanner"
 )
 
 // wireRequest is a raw request captured by startWireServer.

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 // Addendum 7 (interior control/delimiter atoms).

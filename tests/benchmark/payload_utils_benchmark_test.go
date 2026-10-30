@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 /*

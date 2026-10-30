@@ -8,7 +8,7 @@ builds:
     goarch: [amd64]
     env: [CGO_ENABLED=1]
     ldflags:
-      - -X github.com/slicingmelon/gobypass403/core/cli.GOBYPASS403_VERSION={{.Version}} -s -w
+      - -X github.com/herraristotle/gobypass403/core/cli.GOBYPASS403_VERSION={{.Version}} -s -w
 
 before:
   hooks:

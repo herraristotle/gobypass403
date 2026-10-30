@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 // TestDebugTokenRoundTripPreservesBody is a regression guard: the debug token

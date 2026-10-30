@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 // TestHopByHopPayloads pins the unKover `hop_by_hop` parity: for each of the

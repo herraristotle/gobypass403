@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
 )
 
 // http10Versions is the researched text-version set (addendum 3 Phase D,

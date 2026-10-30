@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/slicingmelon/gobypass403/core/engine/recon"
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
+	"github.com/herraristotle/gobypass403/core/engine/recon"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 	"github.com/valyala/fasthttp"
 )
 

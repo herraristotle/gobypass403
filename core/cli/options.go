@@ -17,11 +17,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/slicingmelon/gobypass403/core/engine/adaptive"
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
+	"github.com/herraristotle/gobypass403/core/engine/adaptive"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 )
 
 // Options represents command-line options

@@ -10,7 +10,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/scanner"
+	"github.com/herraristotle/gobypass403/core/engine/scanner"
 )
 
 func TestMaxReqsIsAHardStopOnTheWire(t *testing.T) {

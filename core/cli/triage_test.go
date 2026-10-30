@@ -9,8 +9,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/adaptive"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/adaptive"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 func TestTriagePresetIsRegistryMinusDeep(t *testing.T) {

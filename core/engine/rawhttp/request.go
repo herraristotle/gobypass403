@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 
 	"github.com/slicingmelon/go-bytesutil/bytesutil"
 	"github.com/valyala/fasthttp"
@@ -313,9 +313,16 @@ func WrapRawFastHTTPRequest(req *fasthttp.Request, rawRequest *bytesutil.ByteBuf
 
 func applyReqFlags(req *fasthttp.Request) {
 	req.URI().DisablePathNormalizing = true
+	// Keep a bare '?' / '#' the target carries; fasthttp drops them when the
+	// query/hash parses to nothing, which erases a path variant.
+	req.URI().PreserveDelimiters = true
 	req.Header.DisableNormalizing()
 	req.Header.SetNoDefaultContentType(true)
 	req.Header.DisableSpecialHeader()
+	// Keep the request line built from BypassPayload.RawURI. fasthttp's writer
+	// otherwise re-derives it from the URI object and loses raw variants
+	// (matrix params, '@'-host lines).
+	req.Header.DisableRequestURISync()
 	req.UseHostHeader = true
 }
 

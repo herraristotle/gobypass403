@@ -14,7 +14,7 @@ import (
 
 	"github.com/golang/snappy"
 	"github.com/slicingmelon/go-bytesutil/bytesutil"
-	"github.com/slicingmelon/gobypass403/core/engine/recon"
+	"github.com/herraristotle/gobypass403/core/engine/recon"
 )
 
 // BypassModuleRegistry contains all available bypass modules

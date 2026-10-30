@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 // wordlist mirror for expectations (spec: /v1../v9, /api, /api/v1../v4)

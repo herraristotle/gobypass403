@@ -19,8 +19,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/scanner"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/scanner"
 )
 
 // adaptiveServer is a Server header the nginx rule matches.

@@ -14,8 +14,8 @@ with the flag off nothing here is read or written.
 package scanner
 
 import (
-	"github.com/slicingmelon/gobypass403/core/engine/adaptive"
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/adaptive"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
 )
 
 // adaptiveState is the per-target adaptive bookkeeping. Single-goroutine use,

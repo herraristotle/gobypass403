@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 // Hard caps (approved plan).

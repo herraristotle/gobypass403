@@ -9,10 +9,10 @@ import (
 	_ "net/http/pprof"
 	"os"
 
-	"github.com/slicingmelon/gobypass403/core/cli"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
-	"github.com/slicingmelon/gobypass403/core/utils/profiler"
+	"github.com/herraristotle/gobypass403/core/cli"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
+	"github.com/herraristotle/gobypass403/core/utils/profiler"
 )
 
 func main() {

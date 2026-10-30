@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 func TestExpansionJobsAreRealJobs(t *testing.T) {

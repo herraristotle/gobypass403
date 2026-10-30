@@ -6,8 +6,8 @@ X: x.com/pedro_infosec
 package scanner
 
 import (
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 )
 
 // targetState is everything one target's scan owns while it runs: the payloads

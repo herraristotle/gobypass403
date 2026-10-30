@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
 
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttputil"
 )

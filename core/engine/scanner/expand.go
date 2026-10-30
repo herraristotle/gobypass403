@@ -17,11 +17,11 @@ byte-identical to before.
 package scanner
 
 import (
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
-	"github.com/slicingmelon/gobypass403/core/engine/expand"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/rawhttp"
-	"github.com/slicingmelon/gobypass403/core/utils/helpers"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/expand"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/rawhttp"
+	"github.com/herraristotle/gobypass403/core/utils/helpers"
 )
 
 // expandState collects compact observations for the target being scanned.

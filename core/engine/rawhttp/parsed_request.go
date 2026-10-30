@@ -6,7 +6,7 @@ X: x.com/pedro_infosec
 package rawhttp
 
 import (
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 // ParsedRequest holds a full raw HTTP request imported from a --request-file

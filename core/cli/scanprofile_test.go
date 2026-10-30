@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 // profileTriageWant is the Addendum-4 triage set in BypassModulesRegistry

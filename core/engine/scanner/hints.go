@@ -11,8 +11,8 @@ classifies the same rows with the same code.
 package scanner
 
 import (
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 )
 
 // WildcardHintsForTarget reads the rows a finished run stored for one target

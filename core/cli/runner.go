@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/slicingmelon/gobypass403/core/engine/expand"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
-	"github.com/slicingmelon/gobypass403/core/engine/scanner"
-	GB403ErrorHandler "github.com/slicingmelon/gobypass403/core/utils/error"
-	GB403Logger "github.com/slicingmelon/gobypass403/core/utils/logger"
+	"github.com/herraristotle/gobypass403/core/engine/expand"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/scanner"
+	GB403ErrorHandler "github.com/herraristotle/gobypass403/core/utils/error"
+	GB403Logger "github.com/herraristotle/gobypass403/core/utils/logger"
 )
 
 type Runner struct {

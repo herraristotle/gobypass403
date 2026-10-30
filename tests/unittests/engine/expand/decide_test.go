@@ -14,9 +14,9 @@ package tests
 import (
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/analysis"
-	"github.com/slicingmelon/gobypass403/core/engine/expand"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/analysis"
+	"github.com/herraristotle/gobypass403/core/engine/expand"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 const decideTarget = "https://t.example/access"

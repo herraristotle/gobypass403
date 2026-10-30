@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/slicingmelon/gobypass403/core/engine/recon"
+	"github.com/herraristotle/gobypass403/core/engine/recon"
 )
 
 // requireInternetDNS skips recon tests that probe real internet hosts when

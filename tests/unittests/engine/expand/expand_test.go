@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/slicingmelon/gobypass403/core/engine/expand"
-	"github.com/slicingmelon/gobypass403/core/engine/payload"
+	"github.com/herraristotle/gobypass403/core/engine/expand"
+	"github.com/herraristotle/gobypass403/core/engine/payload"
 )
 
 // fakeComposer records the RawURI it was asked about and returns canned

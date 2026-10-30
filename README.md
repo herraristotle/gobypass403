@@ -77,14 +77,14 @@ A powerful WAF (HTTP 403/401) and URL parser bypass tool developed in Go, design
 
 ## Precompiled Binaries (Recommended)
 
-- Windows, Linux and MacOS builds available: https://github.com/slicingmelon/gobypass403/releases/latest.
+- Windows, Linux and MacOS builds available: https://github.com/herraristotle/gobypass403/releases/latest.
 
 ## Build Locally
 
 ### Standard Build
 
 ```bash
-git clone https://github.com/slicingmelon/gobypass403.git
+git clone https://github.com/herraristotle/gobypass403.git
 go mod download
 go build .\cmd\gobypass403\
 ```
