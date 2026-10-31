@@ -1,0 +1,246 @@
+name: Release GoByPASS403
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  build-linux:
+    name: Build Static Linux Binary
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3.22
+
+    steps:
+      - name: Install dependencies
+        run: apk add --no-cache build-base git curl pkgconf sqlite-dev musl-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure Git Safe Directory
+        run: git config --global --add safe.directory /__w/gobypass403/gobypass403
+
+      - name: Extract version from Git tag
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        shell: sh
+
+      - name: Build Static Linux Binary (CGO + musl)
+        env:
+          CGO_ENABLED: 1
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          # Versionless asset name so consumers can use
+          #   .../releases/latest/download/gobypass403_linux_amd64
+          # GitHub's `latest` rewrites only the tag, never the filename.
+          mkdir -p dist
+          go build -v -a -ldflags "-X github.com/slicingmelon/gobypass403/core/cli.GOBYPASS403_VERSION=${VERSION} -s -w -extldflags '-static'" \
+            -o dist/gobypass403_linux_amd64 ./cmd/gobypass403
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gobypass403-binary-linux-amd64
+          path: dist/*
+
+  build-other:
+    name: Build macOS & Windows
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Extract version from Git tag
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+
+      - name: Build macOS & Windows binaries
+        shell: bash
+        env:
+          CGO_ENABLED: 1
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p dist
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            EXT=".exe"
+          fi
+          # Versionless asset name so consumers can use
+          #   .../releases/latest/download/gobypass403_<os>_<arch>
+          # GitHub's `latest` rewrites only the tag, never the filename.
+          OUTPUT_NAME="dist/gobypass403_${{ matrix.goos }}_${{ matrix.goarch }}${EXT}"
+          LDFLAGS="-X github.com/slicingmelon/gobypass403/core/cli.GOBYPASS403_VERSION=${VERSION} -s -w"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            go build -v -a -ldflags "${LDFLAGS}" -o ${OUTPUT_NAME} ./cmd/gobypass403
+          else
+            go build -v -ldflags "${LDFLAGS}" -o ${OUTPUT_NAME} ./cmd/gobypass403
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gobypass403-binary-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+
+  build-deb:
+    name: Build Debian Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Extract version from Git tag
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            libsqlite3-dev \
+            pkg-config
+
+      - name: Build Linux binary (glibc)
+        env:
+          CGO_ENABLED: 1
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          mkdir -p dist
+          go build -v \
+            -ldflags "-X github.com/slicingmelon/gobypass403/core/cli.GOBYPASS403_VERSION=${VERSION} -s -w" \
+            -o dist/gobypass403_linux_amd64 \
+            ./cmd/gobypass403
+
+      - name: Build Debian package
+        env:
+          VERSION: ${{ env.VERSION }}
+        run: |
+          DEB_DIR="dist/deb/gobypass403_${VERSION}_amd64"
+          mkdir -p "${DEB_DIR}/DEBIAN"
+          mkdir -p "${DEB_DIR}/usr/bin"
+
+          # Copy the binary
+          cp "dist/gobypass403_linux_amd64" "${DEB_DIR}/usr/bin/gobypass403"
+          strip "${DEB_DIR}/usr/bin/gobypass403"
+
+          # Build control file
+          {
+            echo "Package: gobypass403"
+            echo "Version: ${VERSION}"
+            echo "Section: net"
+            echo "Priority: optional"
+            echo "Architecture: amd64"
+            echo "Maintainer: slicingmelon <github.com@slicingmelon>"
+            echo "Depends: libc6 (>= 2.31), libsqlite3-0 (>= 3.30)"
+            echo "Homepage: https://github.com/slicingmelon/gobypass403"
+            echo "Description: Tool to bypass 403/401 authorization errors"
+            echo " A powerful tool designed for security researchers and"
+            echo " penetration testers to bypass 403/401 authorization errors"
+            echo " in web applications. It uses path manipulation, HTTP method"
+            echo " override, header injection, and Unicode normalization to find"
+            echo " bypass vectors."
+          } > "${DEB_DIR}/DEBIAN/control"
+
+          # Compute installed size (in KiB)
+          INSTALLED_SIZE=$(du -sk "${DEB_DIR}/usr" | cut -f1)
+          echo "Installed-Size: ${INSTALLED_SIZE}" >> "${DEB_DIR}/DEBIAN/control"
+
+          # Copy copyright
+          cp debian/copyright "${DEB_DIR}/DEBIAN/copyright"
+
+          # Build the .deb
+          dpkg-deb --build --root-owner-group "${DEB_DIR}" "dist/gobypass403_${VERSION}_amd64.deb"
+
+      - name: Upload Debian package artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gobypass403-deb-amd64
+          path: dist/gobypass403_*.deb
+
+  # Create single release with all binaries
+  release:
+    name: Create Release
+    needs: [build-linux, build-other, build-deb]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        
+      - name: Download all artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          pattern: gobypass403-*
+          merge-multiple: true
+
+      - name: Extract changelog for current version
+        id: changelog
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            BODY=$(awk 'NR > 1 && /^#/ {exit} NR > 1 {print}' CHANGELOG.md)
+            echo 'body<<EOF' >> "$GITHUB_OUTPUT"
+            echo "$BODY" >> "$GITHUB_OUTPUT"
+            echo 'EOF' >> "$GITHUB_OUTPUT"
+          else
+            echo "body=Release for ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd dist
+          ls -A | grep -v '^SHA256SUMS\.txt$' | xargs sha256sum > SHA256SUMS.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: dist/*
+          draft: false
+          fail_on_unmatched_files: true
+          body: ${{ steps.changelog.outputs.body }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
