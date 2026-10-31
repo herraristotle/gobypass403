@@ -47,7 +47,7 @@ jobs:
         run: |
           mkdir -p dist
           go build -v -a -ldflags "-X github.com/slicingmelon/gobypass403/core/cli.GOBYPASS403_VERSION=${VERSION} -s -w -extldflags '-static'" \
-            -o dist/gobypass403_${VERSION}_linux_amd64 ./cmd/gobypass403
+            -o dist/gobypass403_linux_amd64 ./cmd/gobypass403
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
